@@ -44,7 +44,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Static and dynamic analysis across 16 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, and ClamAV signature scanning (700k+ signatures). Returns a scored threat report with per-indicator context, URL list, stream entropy table, and sanitize options. |
+| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Static, dynamic, and ML analysis across 17 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, ClamAV signature scanning (700k+ signatures), and ML Intelligence Engine (IsolationForest anomaly detection + RandomForest classifier with Bayesian contextual scoring and continuous learning). Returns a scored threat report with per-indicator context, URL list, stream entropy table, ML probability score, and sanitize options. |
 | **Protect PDF** | [/pdf/tools/protect.php](https://pqcrypta.com/pdf/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/pdf/tools/unlock.php](https://pqcrypta.com/pdf/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/pdf/tools/redact.php](https://pqcrypta.com/pdf/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
@@ -68,11 +68,11 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 ---
 
-## PDF Threat Scanner — 16 Detection Engines
+## PDF Threat Scanner — 17 Detection Engines
 
 [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php)
 
-15 static analysis engines plus one dynamic behavioral sandbox — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing. All 16 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
+15 static analysis engines, one dynamic behavioral sandbox, and an ML Intelligence Engine — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing, and every scan is persisted to PostgreSQL to continuously improve the ML models. All 17 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
 
 ### How It Works
 
@@ -80,8 +80,9 @@ Every operation runs entirely on the server. Files are processed and immediately
 2. A Python script runs all 13 static heuristic engines (including ExifTool, qpdf, YARA, and PeePDF) against the raw bytes and parsed object graph via PyMuPDF.
 3. Engine ⑭ renders the PDF through Ghostscript, MuPDF, and Poppler inside isolated Linux namespaces (`unshare --net --pid --mount`) with all syscalls captured by `strace`. Detects runtime behavior invisible to static analysis.
 4. Engine ⑯ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
-5. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score.
-6. The client renders a five-tab report: Summary, Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
+5. Engine ⑰ extracts a 38-feature vector from all preceding engine outputs, applies Bayesian contextual scoring, runs IsolationForest anomaly detection (unsupervised — works from scan 1), and RandomForest classification (activates at ≥50 labeled samples). Scan features, scores, and auto-inferred labels are persisted to PostgreSQL. Training runs every 30 minutes via cron.
+6. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score and ML malicious-probability score.
+7. The client renders a five-tab report: Summary (with ML panel), Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
 
 ### Scoring
 
@@ -405,13 +406,45 @@ Runs the local ClamAV daemon against the PDF and reports any signature matches:
 - **Method** — calls `clamdscan --no-summary --fdpass <path>` to pass the open file descriptor directly to the `clamd` daemon, avoiding filesystem permission issues and reusing the already-loaded in-memory signature database for speed (~50–200 ms per scan)
 - **Fallback** — if the daemon returns an error (exit code 2), falls back automatically to `clamscan` (in-process load, ~2–5 s)
 - **Results** — exit code 0 = clean (engine recorded in `engines_run`, no indicator added); exit code 1 = match found, signature name extracted from output and reported as Critical; exit code 2 = scanner error, recorded in `structure.clamav_error`
-- **Distinction** — Engines ①–⑮ use heuristics, structural analysis, and dynamic execution to catch zero-days and novel exploits; Engine ⑯ provides authoritative signature intelligence for confirmed known threats. A ClamAV match means the file is an identified, named malware sample in the global signature database.
+- **Distinction** — Engines ①–⑮ use heuristics, structural analysis, and dynamic execution to catch zero-days and novel exploits; Engine ⑯ provides authoritative signature intelligence for confirmed known threats. A ClamAV match auto-labels the scan record as `malicious` in the ML training database.
+
+### Engine ⑰ — ML Intelligence Engine
+
+Extracts a 38-feature vector from all 16 preceding engine outputs and applies a three-layer ML scoring pipeline:
+
+**Features extracted (38 total)**
+
+Structural flags (`has_js`, `has_launch`, `has_openaction`, `has_embedded`, `has_xfa`, `has_richmedia`, `has_aa`, `has_uri`, `multiple_eof`, `qpdf_damaged`, `exiftool_exploit`), dynamic sandbox signals (`sandbox_network`, `sandbox_mmap_exec`, `sandbox_exec`, `sandbox_timeout`, `sandbox_fork_bomb`), YARA results (`yara_hits`, `yara_heapspray`, `yara_shellcode`, `yara_cve_pattern`), PeePDF results (`peepdf_vuln_count`), entropy metrics (`high_entropy_streams`, `high_entropy_ratio`), document stats (`stream_count`, `page_count`, `object_count`, `object_density`, `url_count`), score counters (`raw_indicator_count`, `raw_critical_count`, `raw_high_count`, `raw_score`), document attributes (`encrypted`, `linearized`, `has_metadata`, `metadata_complete`, `pdf_version`), creator classification (`creator_benign`, `creator_suspicious`).
+
+**Bayesian contextual scoring**
+
+Known-benign creator tools (JasperReports, LibreOffice, OpenOffice, Acrobat, Preview, PrimoPDF, Adobe Distiller, Nitro, Word) dampen the score by up to 10 points. Known-suspicious tools (Metasploit, msfvenom, Canvas, Core Impact, meterpreter) amplify by 30 points and add a Critical indicator.
+
+**IsolationForest (unsupervised)**
+
+Trained on all scan history with `contamination` set to the observed malicious fraction (min 1%, max 10%). Anomaly score converted to malicious probability 0–1. Model version: `if-v1`. Active from scan 1.
+
+**RandomForest (supervised)**
+
+Activates once ≥50 user/auto-labeled samples accumulate. 300 trees, max depth 12, `class_weight='balanced'`. Malicious probability from `predict_proba()`. Model version: `rf-v1-n{samples}`. Cross-validated AUC logged at training time.
+
+**Auto-labeling**
+
+High-confidence signals automatically label scan records for training: ClamAV signature match → `malicious`; dynamic sandbox behavioral score ≥80 → `malicious`; ≥2 YARA critical rule hits → `malicious`. User feedback (false-positive / confirm-threat) overrides auto-labels.
+
+**Continuous improvement**
+
+Training cron (`*/30 * * * * python3 /var/www/html/public/pdf/ml/train.py`) retrains both models every 30 minutes. Models saved to `/pdf/ml/models/` as `.pkl` files via `joblib`. Metadata (sample counts, contamination, CV AUC) persisted to `meta.json`.
+
+**Result display**
+
+The Summary tab shows a lime ML panel: malicious probability bar (0–100%), model version, contextual adjustment note, and false-positive / confirm-threat feedback buttons. Feedback POSTs `scan_id` + `feedback` to `api.php?operation=pdf-scan-feedback`.
 
 ### Report Tabs
 
 | Tab | Contents |
 |---|---|
-| **Summary** | Risk banner (Clean / Low / Suspicious / Dangerous), composite score meter (0–999), 15-cell stats grid, engines-completed pill list, top 5 threats preview |
+| **Summary** | Risk banner (Clean / Low / Suspicious / Dangerous), composite score meter (0–999), 15-cell stats grid, engines-completed pill list, ML Intelligence panel (probability bar, model version, contextual note, feedback buttons), top 5 threats preview |
 | **Threats** | All indicators grouped by risk level (Critical → High → Medium → Low), each showing badge, key, description, count, engine attribution, and byte-context snippet |
 | **URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
 | **Streams** | Table of up to 40 streams: xref number, type, decompressed size, Shannon entropy with inline bar chart, suspicious status, matched pattern list |
@@ -675,6 +708,7 @@ Additional parameter: `font_style`
 | Scripts | Vanilla ES6 JavaScript modules (`type="module"`, no framework) |
 | PDF engines | Ghostscript, Poppler, qpdf, LibreOffice, PyMuPDF, ImageMagick |
 | Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), strace 6.8 + unshare (⑭ sandbox), Correlation (⑮), ClamAV 1.4+ (⑯) |
+| ML / AI | scikit-learn 1.8.0 (IsolationForest + RandomForest), numpy 1.26.4, joblib, psycopg2 — continuous learning (⑰) |
 | PQC crypto | `@noble/post-quantum` |
 | PDF.js | Mozilla PDF.js (page preview rendering, DPI preview, content scanning, corruption diagnostics) |
 | Colour theme | Amber `#ff8c00` + gold `#ffd700` on deep navy `#040810` |
@@ -735,7 +769,7 @@ pdf/
 └── tools/                     # PHP tool pages
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
-    ├── scan.php               # PDF Threat Scanner — 16-engine static + dynamic analysis + sanitize
+    ├── scan.php               # PDF Threat Scanner — 17-engine static + dynamic + ML analysis + sanitize
     ├── merge.php
     ├── split.php
     ├── compress.php
