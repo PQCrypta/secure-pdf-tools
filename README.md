@@ -735,7 +735,7 @@ pdf/
 │   ├── pdf-page-preview.js    # Shared ES module: PdfPagePreview, PdfSplitPreview, PdfReorderPreview, PdfMergePreview, renderSinglePagePreview
 │   └── tools/                 # All tool scripts are ES modules (type="module")
 │       ├── upload.js          # PdfUploadUtil — shared XHR upload handler
-│       ├── scan.js            # Threat scanner — engine strip animation, 5-tab report renderer, sanitize flow
+│       ├── scan.js            # Threat scanner — engine strip animation, 5-tab report renderer, ML panel, sanitize flow
 │       ├── merge.js           # Thumbnail preview + drag reorder
 │       ├── split.js           # Cut-point preview + range/interval modes
 │       ├── compress.js        # DPI slider, before/after split-canvas preview, size comparison
@@ -765,7 +765,16 @@ pdf/
 │       ├── compare.js         # Side-by-side page 1 canvas previews, DPI + sensitivity controls
 │       ├── edit.js            # 15-tool canvas editor, eraser, duplicate page, first/last nav, right-click thumbnail context menu, session timer
 │       └── workflow.js        # Visual step builder, drag reorder
-├── scripts/                   # Python helpers (PyMuPDF operations)
+├── scripts/                   # Python helpers (server-side operations)
+│   ├── pdf_to_excel.py        # Table extraction helper (PyMuPDF + openpyxl)
+│   └── url_to_pdf.cjs         # URL-to-PDF conversion helper (Node.js)
+├── ml/                        # ML Intelligence Engine (Engine ⑰)
+│   ├── train.py               # Training script — IsolationForest + RandomForest, runs every 30 min via cron
+│   └── models/                # Trained model artefacts (git-ignored)
+│       ├── isolation_forest.pkl   # Unsupervised anomaly model
+│       ├── random_forest.pkl      # Supervised classifier (written once ≥50 labeled samples)
+│       ├── scaler.pkl             # StandardScaler fitted on training data
+│       └── meta.json              # Sample counts, contamination rate, CV AUC, feature key list
 └── tools/                     # PHP tool pages
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
