@@ -44,7 +44,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Deep static analysis across 15 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, correlation analysis, and ClamAV signature scanning (700k+ signatures). Returns a scored threat report with per-indicator context, URL list, stream entropy table, and sanitize options. |
+| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Static and dynamic analysis across 16 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, and ClamAV signature scanning (700k+ signatures). Returns a scored threat report with per-indicator context, URL list, stream entropy table, and sanitize options. |
 | **Protect PDF** | [/pdf/tools/protect.php](https://pqcrypta.com/pdf/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/pdf/tools/unlock.php](https://pqcrypta.com/pdf/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/pdf/tools/redact.php](https://pqcrypta.com/pdf/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
@@ -68,19 +68,20 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 ---
 
-## PDF Threat Scanner — 15 Detection Engines
+## PDF Threat Scanner — 16 Detection Engines
 
 [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php)
 
-100% static analysis — the PDF is never executed or rendered in a live engine. All 15 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
+15 static analysis engines plus one dynamic behavioral sandbox — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing. All 16 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
 
 ### How It Works
 
 1. The PDF is uploaded and saved to an isolated temporary directory. A session token is returned for optional sanitize follow-up.
-2. A Python script runs all 14 heuristic engines (including ExifTool, qpdf, YARA, and PeePDF) against the raw bytes and parsed object graph via PyMuPDF.
-3. Engine ⑮ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
-4. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score.
-5. The client renders a five-tab report: Summary, Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
+2. A Python script runs all 13 static heuristic engines (including ExifTool, qpdf, YARA, and PeePDF) against the raw bytes and parsed object graph via PyMuPDF.
+3. Engine ⑭ renders the PDF through Ghostscript, MuPDF, and Poppler inside isolated Linux namespaces (`unshare --net --pid --mount`) with all syscalls captured by `strace`. Detects runtime behavior invisible to static analysis.
+4. Engine ⑯ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
+5. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score.
+6. The client renders a five-tab report: Summary, Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
 
 ### Scoring
 
@@ -93,7 +94,7 @@ Each indicator contributes base points multiplied by `min(count, 3)`:
 | Medium | 10 |
 | Low | 3 |
 
-The Correlation Engine (⑭) adds weighted bonus points (35–100) on top for dangerous indicator combinations. Final score is capped at 999.
+The Correlation Engine (⑮) adds weighted bonus points (35–100) on top for dangerous indicator combinations. Final score is capped at 999.
 
 | Score | Risk Level |
 |---|---|
@@ -232,7 +233,7 @@ Runs `exiftool -PDF:all -XMP:all` to extract metadata layers that are invisible 
 - **XFA confirmation** — independently verifies `HasXFA` from EXIF metadata (cross-check against Engine ④)
 - **Embedded attachment detection** — surfaces `EmbeddedFileSize` / `EmbeddedFile` fields visible only via EXIF layer
 - **Summary export** — Creator, Producer, CreateDate, ModifyDate, PDFVersion, Linearized, PageCount, HasXFA, and Encryption exported to the structure dictionary for the Metadata tab
-- **Feeds Correlation Engine** — sets `exiftool_exploit_found` flag used by Engine ⑭ for compound scoring
+- **Feeds Correlation Engine** — sets `exiftool_exploit_found` flag used by Engine ⑮ for compound scoring
 
 ### Engine ⑪ — qpdf Structural Integrity
 
@@ -243,7 +244,7 @@ Runs `qpdf --check` to validate cross-reference tables, trailer dictionaries, an
 - **Structural errors** — other qpdf errors flagged as Medium risk (up to 3× count multiplier)
 - **Structural warnings** — minor anomalies flagged as Low risk
 - **Status export** — `qpdf_status` (ok / warnings / errors / damaged) exported to structure dictionary
-- **Feeds Correlation Engine** — sets `qpdf_damaged` flag used by Engine ⑭ for compound scoring
+- **Feeds Correlation Engine** — sets `qpdf_damaged` flag used by Engine ⑮ for compound scoring
 
 ### Engine ⑫ — YARA Rule Engine
 
@@ -264,7 +265,7 @@ Compiles and matches 11 custom YARA rules targeting PDF-specific attack byte pat
 | `PDF_Encoder_Chain` | Any 3 of `/ASCII85Decode`, `/ASCIIHexDecode`, `/RunLengthDecode`, `/LZWDecode` |
 
 - **Byte-level independence** — YARA scans raw file bytes, bypassing PDF parser layers entirely; catches patterns hidden in object streams
-- **Feeds Correlation Engine** — populates `yara_hits` set used by Engine ⑭ for compound scoring
+- **Feeds Correlation Engine** — populates `yara_hits` set used by Engine ⑮ for compound scoring
 
 ### Engine ⑬ — PeePDF Deep Analysis
 
@@ -273,13 +274,49 @@ Parses the full PDF object tree using the PeePDF framework — an entirely indep
 - **Vulnerability patterns** — PeePDF's built-in vulnerability detector flags known CVE pattern combinations; each confirmed pattern reported as Critical
 - **Suspicious element location** — reports exact object IDs for dangerous elements from both `Suspicious elements` and `Dangerous elements` dictionaries: `/Launch`, `getIcon()`, `printf()`, `unescape()`, `exportDataObject()`, `submitForm()`, `/EmbeddedFile`, `/JS`, `/JavaScript`, `eval()`, `/OpenAction`, `/AA`, `/XFA`, `/URI`
 - **JavaScript object inventory** — lists all PDF object IDs containing JavaScript
-- **Independent verification** — cross-checks PyMuPDF-based findings; if both parsers flag the same element, the compound risk in Engine ⑭ is elevated
+- **Independent verification** — cross-checks PyMuPDF-based findings; if both parsers flag the same element, the compound risk in Engine ⑮ is elevated
 - **Summary export** — PDF version, object count, stream count, and vulnerability count exported to structure dictionary
-- **Feeds Correlation Engine** — sets `peepdf_vuln_count` used by Engine ⑭ for compound scoring
+- **Feeds Correlation Engine** — sets `peepdf_vuln_count` used by Engine ⑮ for compound scoring
 
-### Engine ⑭ — Correlation Engine
+### Engine ⑭ — Dynamic Behavioral Sandbox
 
-Cross-references all findings from Engines ①–⑬ and scores 30+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
+The only engine that actually *executes* the PDF. Renders the file through three independent interpreters inside fully isolated Linux process namespaces, capturing all syscalls via `strace`:
+
+**Isolation architecture**
+
+| Layer | Mechanism | Effect |
+|---|---|---|
+| Network namespace | `unshare --net` | New network stack with no interfaces — all `connect()` calls fail and are logged |
+| PID namespace | `unshare --pid --fork` | Isolated process tree; child PIDs cannot escape |
+| Mount namespace | `unshare --mount --mount-proc` | Isolated `/proc` — sandbox cannot inspect host processes |
+| Syscall tracing | `strace -f -q` | Every syscall of every child process captured to log |
+| Time limit | `timeout 20` per renderer | Hang/loop exploits terminated and flagged |
+
+**Renderers run (in sequence)**
+
+| Renderer | Binary | What it exercises |
+|---|---|---|
+| Ghostscript | `gs -dNOSAFER -sDEVICE=nullpage` | Full PostScript interpreter + PDF JavaScript engine |
+| MuPDF | `mutool draw -o /dev/null` | Compact independent C renderer; different parser attack surface |
+| Poppler | `pdftotext` | Stream-based text extractor; distinct xref/stream handling |
+
+**Behavioral threat indicators**
+
+| Indicator | Detection | Risk |
+|---|---|---|
+| **Network beacon** | `connect()`/`socket()` with `AF_INET`/`AF_INET6` in isolated namespace | Critical (+80) |
+| **Shellcode execution** | `mmap()` with `PROT_EXEC|MAP_ANONYMOUS` — anonymous executable memory | Critical (+70) |
+| **Process spawn** | `execve()` of any binary not in the renderer launch chain | Critical (+85) |
+| **Filesystem escape** | `openat()` with `O_WRONLY`/`O_RDWR` to paths outside sandbox dir | High (+60) |
+| **Process bomb** | >50 `fork`/`clone`/`vfork` syscalls | High (+40) |
+| **Render timeout** | Renderer exceeds 20-second execution limit | High (+35) |
+
+- **Network isolation guarantee** — in a network namespace with no interfaces, any `connect()` is definitively malicious. There is no legitimate reason for a PDF renderer to initiate a network connection.
+- **Feeds Correlation Engine** — sets `sandbox_network_attempts`, `sandbox_mmap_exec_anon`, `sandbox_exec_attempts`, `sandbox_behavioral_score` flags used by Engine ⑮ for compound scoring
+
+### Engine ⑮ — Correlation Engine
+
+Cross-references all findings from Engines ①–⑭ and scores 30+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
 
 **Auto-execution combinations (highest danger)**
 
@@ -331,7 +368,7 @@ Cross-references all findings from Engines ①–⑬ and scores 30+ dangerous in
 | `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
 | Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
 
-**Cross-engine compound patterns (Engines ⑩–⑬ → ⑭)**
+**Cross-engine compound patterns (Engines ⑩–⑬ → ⑮)**
 
 | Combination | Bonus | Why |
 |---|---|---|
@@ -345,9 +382,22 @@ Cross-references all findings from Engines ①–⑬ and scores 30+ dangerous in
 | PeePDF vulnerability + JavaScript | +55–85 | Cross-engine vulnerability confirmation (scales with vuln count) |
 | PeePDF vulnerability + heap-spray | +65 | Full memory-corruption exploit chain confirmed by independent parser |
 
+**Dynamic sandbox compound patterns (Engine ⑭ → ⑮)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Dynamic network beacon + JavaScript | +95 | Live connection attempt confirmed + JS delivery vector — active C2-connected exploit |
+| Dynamic shellcode + heap-spray | +95 | Runtime anonymous exec memory + static heap spray — full memory-corruption chain confirmed by both static and dynamic analysis |
+| Dynamic shell spawn + PDF trigger (`/AA`, `/OpenAction`, `/Launch`) | +95 | Runtime process execution + auto-trigger mechanism — confirmed exploitation with persistence hook |
+| Dynamic exploitation + ExifTool exploit-kit fingerprint | +90 | Runtime behavior + known exploit-kit origin — high-confidence exploit kit delivery |
+| Dynamic exploitation + PeePDF vulnerability | +90 | Two independent analysis paths (dynamic + structural) both confirm exploitation |
+| Dynamic beacon + suspicious URL match | +85 | Live network calls + static C2-pattern URLs — confirmed exfiltration capability |
+| Dynamic shellcode + JavaScript | +90 | Runtime exec memory + JS delivery vector — JS staging shellcode payload confirmed |
+| Render timeout + JavaScript | +45 | Renderer hung >20 s + embedded JS — JS infinite-loop DoS exploit |
+
 **Dampening:** isolated `/OpenAction` with no JavaScript, no `/Launch`, no embedded files, no heapspray, no XFA, and no RichMedia has its score reduced by 7 points — `/OpenAction` alone is common in legitimate PDFs for navigation and zoom.
 
-### Engine ⑮ — ClamAV Signature Scanner
+### Engine ⑯ — ClamAV Signature Scanner
 
 Runs the local ClamAV daemon against the PDF and reports any signature matches:
 
@@ -355,7 +405,7 @@ Runs the local ClamAV daemon against the PDF and reports any signature matches:
 - **Method** — calls `clamdscan --no-summary --fdpass <path>` to pass the open file descriptor directly to the `clamd` daemon, avoiding filesystem permission issues and reusing the already-loaded in-memory signature database for speed (~50–200 ms per scan)
 - **Fallback** — if the daemon returns an error (exit code 2), falls back automatically to `clamscan` (in-process load, ~2–5 s)
 - **Results** — exit code 0 = clean (engine recorded in `engines_run`, no indicator added); exit code 1 = match found, signature name extracted from output and reported as Critical; exit code 2 = scanner error, recorded in `structure.clamav_error`
-- **Distinction** — Engines ①–⑭ use heuristics and structural analysis to catch zero-days and novel exploits; Engine ⑮ provides authoritative signature intelligence for confirmed known threats. A ClamAV match means the file is an identified, named malware sample in the global signature database.
+- **Distinction** — Engines ①–⑮ use heuristics, structural analysis, and dynamic execution to catch zero-days and novel exploits; Engine ⑯ provides authoritative signature intelligence for confirmed known threats. A ClamAV match means the file is an identified, named malware sample in the global signature database.
 
 ### Report Tabs
 
@@ -624,7 +674,7 @@ Additional parameter: `font_style`
 | Styling | Vanilla CSS (CSS variables, Grid, custom animations) |
 | Scripts | Vanilla ES6 JavaScript modules (`type="module"`, no framework) |
 | PDF engines | Ghostscript, Poppler, qpdf, LibreOffice, PyMuPDF, ImageMagick |
-| Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), Correlation (⑭), ClamAV 1.4+ (⑮) |
+| Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), strace 6.8 + unshare (⑭ sandbox), Correlation (⑮), ClamAV 1.4+ (⑯) |
 | PQC crypto | `@noble/post-quantum` |
 | PDF.js | Mozilla PDF.js (page preview rendering, DPI preview, content scanning, corruption diagnostics) |
 | Colour theme | Amber `#ff8c00` + gold `#ffd700` on deep navy `#040810` |
@@ -685,7 +735,7 @@ pdf/
 └── tools/                     # PHP tool pages
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
-    ├── scan.php               # PDF Threat Scanner — 15-engine static analysis + sanitize
+    ├── scan.php               # PDF Threat Scanner — 16-engine static + dynamic analysis + sanitize
     ├── merge.php
     ├── split.php
     ├── compress.php
