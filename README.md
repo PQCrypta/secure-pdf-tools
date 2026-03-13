@@ -9,7 +9,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 ---
 
-## Tools (29 Operations)
+## Tools (30)
 
 ### Core Manipulation
 
@@ -720,7 +720,7 @@ Additional parameter: `font_style`
 ```
 pdf/
 ├── index.php                  # Hub — tool cards, search, drag-drop, IndexedDB file transfer
-├── api.php                    # Single POST endpoint — all 38 operations
+├── api.php                    # Single POST endpoint — all 40 operations
 ├── README.md                  # This file
 ├── css/
 │   ├── pdf.css                # Complete UI styles
