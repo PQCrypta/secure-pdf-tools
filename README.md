@@ -9,7 +9,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 ---
 
-## Tools (28 Operations)
+## Tools (29 Operations)
 
 ### Core Manipulation
 
@@ -44,6 +44,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 | Tool | Link | Description |
 |---|---|---|
+| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Deep static analysis across 11 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph walking, URL extraction, metadata inspection, font anomaly detection, CVE pattern matching, structural statistics, correlation analysis, and ClamAV signature scanning (700k+ signatures). Returns a scored threat report with per-indicator context, URL list, stream entropy table, and sanitize options. |
 | **Protect PDF** | [/pdf/tools/protect.php](https://pqcrypta.com/pdf/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/pdf/tools/unlock.php](https://pqcrypta.com/pdf/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/pdf/tools/redact.php](https://pqcrypta.com/pdf/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
@@ -54,7 +55,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 |---|---|---|
 | **Add Watermark** | [/pdf/tools/watermark.php](https://pqcrypta.com/pdf/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
 | **Sign PDF** | [/pdf/tools/sign.php](https://pqcrypta.com/pdf/tools/sign.php) | Three signature input methods: draw (canvas with touch support), type (text-rendered), or upload an image. Place on first/last/custom page with x/y/size controls. Live placement preview: after drawing, typing, or uploading a signature, it is composited directly onto a rendered page 1 canvas at the chosen position and size — updates in real time as you move the position selectors or drag the size slider. Optional cryptographic metadata. |
-| **Edit PDF** | [/pdf/tools/edit.php](https://pqcrypta.com/pdf/tools/edit.php) | Full page-by-page visual editor with 14 annotation tools (see below). |
+| **Edit PDF** | [/pdf/tools/edit.php](https://pqcrypta.com/pdf/tools/edit.php) | Full page-by-page visual editor with 15 annotation tools (see below). |
 | **Compare PDFs** | [/pdf/tools/compare.php](https://pqcrypta.com/pdf/tools/compare.php) | Visual diff of two PDFs. Configure DPI (72/96/150/300) and sensitivity. Side-by-side page 1 canvas previews render immediately when each file is selected. Outputs a highlighted diff PDF with change regions marked. |
 | **Extract Text** | [/pdf/tools/extract-text.php](https://pqcrypta.com/pdf/tools/extract-text.php) | Export all text to `.txt`. Options: layout preservation, text encoding, custom page range. |
 | **PDF Info** | [/pdf/tools/pdf-info.php](https://pqcrypta.com/pdf/tools/pdf-info.php) | Display full metadata: title, author, subject, keywords, creator, producer, page count, dimensions, PDF version, encryption status, form type, tagged flag, page rotation, fast web view optimisation, creation and modification dates, permission flags. Shows a quick canvas preview of page 1 alongside the metadata. |
@@ -67,7 +68,240 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 ---
 
-## Edit PDF — 14 Annotation Tools
+## PDF Threat Scanner — 11 Detection Engines
+
+[/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php)
+
+100% static analysis — the PDF is never executed or rendered in a live engine. All 11 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
+
+### How It Works
+
+1. The PDF is uploaded and saved to an isolated temporary directory. A session token is returned for optional sanitize follow-up.
+2. A Python script runs all 10 heuristic engines against the raw bytes and parsed object graph via PyMuPDF.
+3. Engine ⑪ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
+4. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score.
+5. The client renders a five-tab report: Summary, Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
+
+### Scoring
+
+Each indicator contributes base points multiplied by `min(count, 3)`:
+
+| Risk Level | Base Points |
+|---|---|
+| Critical | 50 |
+| High | 25 |
+| Medium | 10 |
+| Low | 3 |
+
+The Correlation Engine (⑩) adds weighted bonus points (35–100) on top for dangerous indicator combinations. Final score is capped at 999.
+
+| Score | Risk Level |
+|---|---|
+| 0 | Clean |
+| 1–14 | Low |
+| 15–54 | Suspicious |
+| 55–999 | Dangerous |
+
+### Engine ① — Structure Validator
+
+Validates the fundamental file structure before any content analysis:
+
+- **Header position** — flags `%PDF-` found beyond byte offset 1024 (exploit obfuscation technique)
+- **`%%EOF` markers** — counts end-of-file markers; >2 indicates incremental update stacking or exploit layering
+- **XRef table count** — flags >3 cross-reference tables; complex update chains can hide malicious objects
+- **Obfuscation codecs** — counts `ASCIIHexDecode`, `ASCII85Decode`, `LZWDecode` occurrences; >3 flags multi-layer encoding used to evade static scanners
+- **Excessive filter chains** — flags >120 `/Filter` entries in a single file (abnormal density indicating deeply nested stream obfuscation)
+- **Structural data collected** — `pdf_version`, `linearized` flag, binary comment presence, `eof_markers`, `xref_tables`, `filter_count`
+
+### Engine ② — Raw Pattern Scanner
+
+Scans raw file bytes for 45+ known-malicious byte sequences across six categories. Each match records the occurrence count and a 80-byte context snippet (20 bytes before, 60 bytes after) for the Threats tab.
+
+**JavaScript execution**
+`/JavaScript`, `/JS` (space / CR / LF / paren / hex variants), `/Launch`, `/OpenAction`, `/AA`
+
+**Remote & form actions**
+`/GoToR`, `/GoToE`, `/SubmitForm`, `/ImportData`, `/Named`, `/Rendition`, `/Sound`, `/Movie`, `/Hide`
+
+**Embedded & rich content**
+`/EmbeddedFile`, `/RichMedia`, `/XFA`, `/AcroForm`
+
+**Obfuscation structures**
+`/ObjStm`, `/Encrypt`, `/JBIG2Decode`, `/ASCIIHexDecode`, `/ASCII85Decode`
+
+**Dangerous JavaScript APIs**
+`unescape()`, `eval()`, `String.fromCharCode`, `this.exportDataObject`, `this.submitForm`, `app.openDoc`, `collab.getIcon` (CVE-2009-0927), `util.printf` (CVE-2008-2992), `util.printd` (CVE-2007-5020), `media.newPlayer` (CVE-2009-4324), `Collab.collectEmailInfo` (CVE-2007-5659)
+
+**Shellcode & heapspray signatures**
+`%u9090` (Unicode NOP sled), `%u4141` (classic heapspray fill), `%u0c0c%u0c0c` (0x0C heap-fill pattern), `%u0d0d%u0d0d` (0x0D heap-fill pattern)
+
+### Engine ③ — Stream Decompressor & Content Inspector
+
+Opens every object in the xref graph (up to 6,000 objects) via PyMuPDF and inspects each stream:
+
+- **Decompression** — calls `doc.xref_stream(xref)` to decompress FlateDecode and other encoded streams, then re-scans the decompressed content — catching JavaScript and shellcode hidden inside compressed objects that raw-byte scanners miss entirely
+- **Shannon entropy** — calculates per-stream entropy (0–8 bits/byte); values above 7.2 on non-image streams flag encrypted, packed, or obfuscated payloads. Image streams (`/DCTDecode`, `/JPXDecode`, `/CCITTFax`, `/JBIG2`) are excluded from entropy flagging.
+- **14 JS/shellcode signatures** scanned in decompressed content: `function `, `var `, `eval(`, `unescape(`, `String.fromCharCode`, `this.exportDataObject`, `app.openDoc`, `collab.`, `util.printf`, `.submitForm`, `%u9090`, `%u4141`, `\x0c×8`
+- **Stream type classification** — `data`, `font`, `xobject`, `javascript`, `embedded`
+- **Report data** — up to 40 streams returned with xref number, decompressed size, entropy value, type, suspicious flag, and matched pattern list
+
+### Engine ④ — Object Graph Analyzer
+
+Walks the full xref graph (up to 6,000 objects), reads every object dictionary, and checks for 10 dangerous action-type combinations:
+
+| Dictionary Pattern | Label | Risk |
+|---|---|---|
+| `/S /Launch` | Launch action object | Critical |
+| `/S /JavaScript` | JavaScript action object | Critical |
+| `/S /SubmitForm` | Form submit action object | Medium |
+| `/S /ImportData` | Import data action object | Medium |
+| `/S /GoToR` | Remote go-to action object | Medium |
+| `/S /GoToE` | Embedded navigation action | Medium |
+| `/S /Named` | Named action object | Medium |
+| `/S /Rendition` | Rendition action object | Medium |
+| `/RichMedia` | Rich media annotation | High |
+| `/XFA` | XFA form object | High |
+
+Reports the exact xref object numbers of all matched Launch and JavaScript objects for forensic attribution.
+
+### Engine ⑤ — URL Extractor
+
+Extracts all HTTP/HTTPS URLs from two passes:
+
+1. **Raw bytes** — regex scan of the entire file (`https?://` followed by 4–250 non-whitespace chars)
+2. **Decompressed streams** — same regex applied inside every decompressed stream, catching URLs embedded inside compressed objects
+
+URLs are de-duplicated and capped at 150. The Correlation Engine cross-references extracted URLs and flags three patterns as High: IP-literal addresses (`http://1.2.3.4/...`), raw port numbers (`http://host:4444/...`), and 12+ character random-looking subdomains.
+
+### Engine ⑥ — Metadata Analyzer
+
+Reads all standard PDF metadata fields via PyMuPDF (`title`, `author`, `subject`, `keywords`, `creator`, `producer`, `creationDate`, `modDate`, `format`) and performs three checks:
+
+- **Exploit-tool strings** — scans `Creator` and `Producer` fields for known strings: `exploit`, `metasploit`, `canvas`, `core impact`, `meterpreter`, `shellcode`, `payload`, `pdfcrack`, `hashcat`, `dompdf exploit`. A match reports the exact field value as Critical.
+- **Empty metadata** — flags PDFs with no title, author, creator, or producer. Exploit-crafted PDFs routinely strip all metadata to reduce forensic attribution and avoid reputation-based sandbox triggers. Reported as Low; escalated by the Correlation Engine when combined with JavaScript or embedded files.
+- **XMP stream** — reads the XML metadata stream and flags any `<script` or `javascript` reference as High.
+
+### Engine ⑦ — Font Anomaly Detector
+
+Inspects every object dictionary containing `/Font` for two historically exploited patterns:
+
+- **`/JBIG2Decode` in font streams** — the JBIG2 image compression codec linked directly to CVE-2009-0658 (critical Adobe Reader 0-day, all versions ≤9.0, CVSS 9.3) and CVE-2010-0188 (LibTIFF heap overflow via embedded TIFF). Reported as Critical.
+- **Oversized `/Widths` arrays** — font objects with `/Widths` arrays longer than 600 characters, matching the abnormally large glyph-width arrays used in historic heap overflow attacks against Acrobat's font rendering engine. Reported as High.
+
+### Engine ⑧ — CVE Pattern Matcher
+
+Nine specific CVE signatures matched by boolean lambda tests against raw bytes:
+
+| Match Condition | CVE / Label | Severity |
+|---|---|---|
+| `/JBIG2Decode` + `/JavaScript` both present | CVE-2009-0658 | Critical |
+| `/TIFF` + (`/Launch` or `/JavaScript`) | CVE-2010-0188 | Critical |
+| `util.printf` present | CVE-2008-2992 | Critical |
+| `collab.getIcon` present | CVE-2009-0927 | Critical |
+| `util.printd` present | CVE-2007-5020 | Critical |
+| `Collab.collectEmailInfo` present | CVE-2007-5659 | Critical |
+| `media.newPlayer` present | CVE-2009-4324 | Critical |
+| `%u0c0c%u0c0c` or binary `\x0c×8` | Heapspray (0x0C fill) | Critical |
+| `%u0d0d%u0d0d` | Heapspray (0x0D fill) | Critical |
+
+### Engine ⑨ — Structural Statistics
+
+Collects document-level statistics via PyMuPDF for the 15-cell summary dashboard:
+
+| Stat | Source |
+|---|---|
+| Page count | `doc.page_count` |
+| Object count | `doc.xref_length() - 1` |
+| Encrypted | `doc.needs_pass` |
+| Embedded file count | `doc.embfile_count()` |
+| Form field count | `doc.get_fields()` |
+| Annotation count | Sum of `page.annots()` across all pages |
+| Link count | Sum of `page.get_links()` across all pages |
+| File size | `os.path.getsize()` |
+| PDF version | From Engine ① |
+| %%EOF markers | From Engine ① |
+| XRef tables | From Engine ① |
+| Total streams | From Engine ③ |
+| High-entropy streams | From Engine ③ |
+
+### Engine ⑩ — Correlation Engine
+
+Cross-references all findings from Engines ①–⑨ and scores 20+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
+
+**Auto-execution combinations (highest danger)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| `/OpenAction` + JavaScript | +75 | Document auto-executes JS on open — zero user interaction required |
+| `/OpenAction` + `/Launch` | +80 | Auto-launches external program on open |
+| JavaScript + `/Launch` | +80 | Script-controlled arbitrary program execution |
+
+**Payload delivery combinations**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| JavaScript + `/EmbeddedFile` | +65 | `exportDataObject()` drops attachment to disk and executes it |
+| JavaScript + `/XFA` | +45 | XFA+JS full document scripting — multiple historic critical CVEs |
+| JavaScript + `/RichMedia` | +40 | JS controls Flash/multimedia objects — historic heap-spray surface |
+
+**Obfuscation & shellcode chains**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| `unescape()` + JavaScript | +75 | Classic Unicode-escaped shellcode decode-and-execute |
+| `eval()` + JavaScript | +60 | Dynamic execution of obfuscated payload strings |
+| `eval()` + `unescape()` | +85 | Textbook two-stage shellcode loader |
+| `String.fromCharCode` + JavaScript | +40 | Character-level string assembly to evade pattern matching |
+| `/JBIG2Decode` + JavaScript | +100 | CVE-2009-0658 exact combination confirmed (CVSS 9.3) |
+| JavaScript + heapspray | +90 | JS sprays the heap before triggering a vulnerability |
+| Multiple heapspray patterns (≥2) | +80 | Two or more distinct NOP/heap-fill sigs = active exploit attempt |
+| Deep encoding + JavaScript | +50 | Multi-pass codec layers hiding JS from static scanners |
+| Multiple `%%EOF` + JavaScript | +35 | Polyglot structure confuses parsers away from malicious JS objects |
+
+**Metadata & structure combinations**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Empty metadata + JavaScript | +35 | Stripped attribution + active scripting = crafted exploit profile |
+| Empty metadata + `/EmbeddedFile` | +20 | Dropper PDFs strip metadata to avoid reputation-based triggers |
+| `/OpenAction` + `/EmbeddedFile` | +45 | Auto-triggered file drop on open — no JavaScript required |
+| `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
+| Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
+
+**Dampening:** isolated `/OpenAction` with no JavaScript, no `/Launch`, no embedded files, no heapspray, no XFA, and no RichMedia has its score reduced by 7 points — `/OpenAction` alone is common in legitimate PDFs for navigation and zoom.
+
+### Engine ⑪ — ClamAV Signature Scanner
+
+Runs the local ClamAV daemon against the PDF and reports any signature matches:
+
+- **Database** — 700,000+ signatures updated daily via `freshclam`, including the full `Pdf.Exploit.*` family (`Pdf.Exploit.CVE_2009_0927`, `Pdf.Exploit.CVE_2009_4324`, `Exploit.PDF-JS.*`, and many more)
+- **Method** — calls `clamdscan --no-summary --fdpass <path>` to pass the open file descriptor directly to the `clamd` daemon, avoiding filesystem permission issues and reusing the already-loaded in-memory signature database for speed (~50–200 ms per scan)
+- **Fallback** — if the daemon returns an error (exit code 2), falls back automatically to `clamscan` (in-process load, ~2–5 s)
+- **Results** — exit code 0 = clean (engine recorded in `engines_run`, no indicator added); exit code 1 = match found, signature name extracted from output and reported as Critical; exit code 2 = scanner error, recorded in `structure.clamav_error`
+- **Distinction** — Engines ①–⑩ use heuristics and structural analysis to catch zero-days and novel exploits; Engine ⑪ provides authoritative signature intelligence for confirmed known threats. A ClamAV match means the file is an identified, named malware sample in the global signature database.
+
+### Report Tabs
+
+| Tab | Contents |
+|---|---|
+| **Summary** | Risk banner (Clean / Low / Suspicious / Dangerous), composite score meter (0–999), 15-cell stats grid, engines-completed pill list, top 5 threats preview |
+| **Threats** | All indicators grouped by risk level (Critical → High → Medium → Low), each showing badge, key, description, count, engine attribution, and byte-context snippet |
+| **URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
+| **Streams** | Table of up to 40 streams: xref number, type, decompressed size, Shannon entropy with inline bar chart, suspicious status, matched pattern list |
+| **Metadata** | Document metadata KV table (title, author, subject, keywords, creator, producer, dates, format, XMP flag) + structure info KV table (version, EOF markers, xref tables, linearized, binary comment, stream counts) |
+
+### Sanitize Options
+
+After a scan, two sanitize methods are available using the session token — the original is never modified.
+
+| Method | How | Safety |
+|---|---|---|
+| **Flatten to Images** | Renders every page to 144 DPI raster images via PyMuPDF, rebuilds as a new PDF | Maximum — destroys all JavaScript, launch actions, embedded files, XFA forms, rich media, and object streams with absolute certainty. Text becomes non-searchable. |
+| **Strip Active Content** | Re-processes through Ghostscript with `-dSAFER` | Preserves searchable text and document structure. Removes JavaScript, launch actions, embedded files, and rich media. Cannot guarantee removal of zero-day or heavily obfuscated exploit structures. |
+
+---
+
+## Edit PDF — 15 Annotation Tools
 
 [/pdf/tools/edit.php](https://pqcrypta.com/pdf/tools/edit.php)
 
@@ -77,6 +311,7 @@ The editor renders each page to a canvas and applies all changes server-side via
 |---|---|
 | **Text** | Click to place a text box. Font family (Helvetica / Times / Courier), font size, bold, italic, left/centre/right alignment, colour. |
 | **Draw** | Freehand pen with configurable line width (slider with live preview) and colour. |
+| **Eraser** | Freehand white-stroke eraser — paints white over any content. Line width scales with the width slider (2× multiplier, minimum 10 pt). Applied as a white draw path via PyMuPDF on export. |
 | **Line** | Straight line with stroke width and colour. |
 | **Arrow** | Directional arrow annotation. |
 | **Rectangle** | Rectangle with fill/outline toggle, independent fill colour, fill opacity, stroke width, and colour. |
@@ -95,12 +330,45 @@ The editor renders each page to a canvas and applies all changes server-side via
 - **Page numbering** — auto-add page numbers with position (top/bottom/left/right), format (1 / Page 1 / 1 of 10), start number, font size, and colour
 - **Headers & footers** — insert header and footer text with alignment, font size, and colour
 - **Insert blank page** — add a blank page before or after the current page; also supports creating a new blank PDF from scratch
-- **Page rotation** — per-page rotation in degrees
+- **Duplicate page** — copy the current page (image, annotations, and rotation) and insert it immediately after
+- **Page rotation** — per-page rotation (toolbar buttons for current page, or right-click any thumbnail for any page)
 - **Undo / redo** — per-page history stack
 - **Zoom controls** — adjustable canvas zoom
 - **Stroke style** — solid, dashed, dotted, or dash-dot per annotation
 - **Annotation opacity** — global opacity slider applied to highlights and filled shapes
 - **Preferences persistence** — last-used tool, colour, font family, font size, line width, fill mode, and zoom are saved in a cookie
+- **Session timer** — a floating badge (bottom-right) counts down from 30 minutes of inactivity. Any canvas interaction, tool change, or keypress resets the timer. The badge turns amber at 5 minutes remaining and red at 2 minutes. A keepalive ping is sent to the server every 5 minutes of activity so the server-side session TTL stays in sync. After 30 minutes of inactivity the session expires and a fresh upload is required.
+
+### Page Thumbnail Sidebar
+
+Pages are displayed as draggable thumbnails in the left sidebar:
+
+- **Drag to reorder** — drag any thumbnail to a new position; all annotation and rotation state moves with it
+- **Click to navigate** — click any thumbnail to jump to that page
+- **Right-click context menu** — right-click any thumbnail to access per-page operations without navigating away:
+
+| Action | Description |
+|---|---|
+| Go to Page N | Navigate to that page |
+| Rotate 90° Clockwise | Rotate that specific page CW |
+| Rotate 90° Counter-clockwise | Rotate that specific page CCW |
+| Rotate 180° | Flip that page upside down |
+| Duplicate Page | Copy page + annotations, insert after |
+| Insert Blank Before | Insert empty page before this page |
+| Insert Blank After | Insert empty page after this page |
+| Move to First | Move this page to position 1 |
+| Move to Last | Move this page to the end |
+| Delete Page | Remove this page (disabled on single-page docs) |
+
+### Page Navigation Toolbar
+
+| Button | Action |
+|---|---|
+| ⏮ First | Jump to page 1 |
+| ◀ Prev | Previous page (keyboard: ←) |
+| Page counter | Current / total display |
+| ▶ Next | Next page (keyboard: →) |
+| ⏭ Last | Jump to last page |
 
 ---
 
@@ -279,6 +547,7 @@ Additional parameter: `font_style`
 | Styling | Vanilla CSS (CSS variables, Grid, custom animations) |
 | Scripts | Vanilla ES6 JavaScript modules (`type="module"`, no framework) |
 | PDF engines | Ghostscript, Poppler, qpdf, LibreOffice, PyMuPDF, ImageMagick |
+| Threat scanning | PyMuPDF (heuristic engines ①–⑩), ClamAV 1.4+ with daily signature updates (engine ⑪) |
 | PQC crypto | `@noble/post-quantum` |
 | PDF.js | Mozilla PDF.js (page preview rendering, DPI preview, content scanning, corruption diagnostics) |
 | Colour theme | Amber `#ff8c00` + gold `#ffd700` on deep navy `#040810` |
@@ -290,11 +559,13 @@ Additional parameter: `font_style`
 ```
 pdf/
 ├── index.php                  # Hub — tool cards, search, drag-drop, IndexedDB file transfer
-├── api.php                    # Single POST endpoint — all 37 operations
+├── api.php                    # Single POST endpoint — all 38 operations
+├── README.md                  # This file
 ├── css/
 │   ├── pdf.css                # Complete UI styles
 │   ├── pdf-background.css     # Canvas container
-│   └── pdf-cursor.css         # Ink trail cursor
+│   ├── pdf-cursor.css         # Ink trail cursor
+│   └── scan.css               # Threat scanner styles (risk colours, engine chips, stream table, score meter)
 ├── js/
 │   ├── pdf.js                 # Hub init, search, drag-drop routing
 │   ├── pdf-background.js      # Floating docs + particle animation
@@ -303,6 +574,7 @@ pdf/
 │   ├── pdf-page-preview.js    # Shared ES module: PdfPagePreview, PdfSplitPreview, PdfReorderPreview, PdfMergePreview, renderSinglePagePreview
 │   └── tools/                 # All tool scripts are ES modules (type="module")
 │       ├── upload.js          # PdfUploadUtil — shared XHR upload handler
+│       ├── scan.js            # Threat scanner — engine strip animation, 5-tab report renderer, sanitize flow
 │       ├── merge.js           # Thumbnail preview + drag reorder
 │       ├── split.js           # Cut-point preview + range/interval modes
 │       ├── compress.js        # DPI slider, before/after split-canvas preview, size comparison
@@ -330,12 +602,13 @@ pdf/
 │       ├── html-to-pdf.js
 │       ├── redact.js          # Text patterns + region drawing mode
 │       ├── compare.js         # Side-by-side page 1 canvas previews, DPI + sensitivity controls
-│       ├── edit.js            # 14-tool canvas editor, bold/italic text, fill opacity, annotation opacity
+│       ├── edit.js            # 15-tool canvas editor, eraser, duplicate page, first/last nav, right-click thumbnail context menu, session timer
 │       └── workflow.js        # Visual step builder, drag reorder
 ├── scripts/                   # Python helpers (PyMuPDF operations)
 └── tools/                     # PHP tool pages
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
+    ├── scan.php               # PDF Threat Scanner — 11-engine static analysis + sanitize
     ├── merge.php
     ├── split.php
     ├── compress.php
