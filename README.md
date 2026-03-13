@@ -44,7 +44,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Deep static analysis across 11 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph walking, URL extraction, metadata inspection, font anomaly detection, CVE pattern matching, structural statistics, correlation analysis, and ClamAV signature scanning (700k+ signatures). Returns a scored threat report with per-indicator context, URL list, stream entropy table, and sanitize options. |
+| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Deep static analysis across 15 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, correlation analysis, and ClamAV signature scanning (700k+ signatures). Returns a scored threat report with per-indicator context, URL list, stream entropy table, and sanitize options. |
 | **Protect PDF** | [/pdf/tools/protect.php](https://pqcrypta.com/pdf/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/pdf/tools/unlock.php](https://pqcrypta.com/pdf/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/pdf/tools/redact.php](https://pqcrypta.com/pdf/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
@@ -68,17 +68,17 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 ---
 
-## PDF Threat Scanner — 11 Detection Engines
+## PDF Threat Scanner — 15 Detection Engines
 
 [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php)
 
-100% static analysis — the PDF is never executed or rendered in a live engine. All 11 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
+100% static analysis — the PDF is never executed or rendered in a live engine. All 15 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
 
 ### How It Works
 
 1. The PDF is uploaded and saved to an isolated temporary directory. A session token is returned for optional sanitize follow-up.
-2. A Python script runs all 10 heuristic engines against the raw bytes and parsed object graph via PyMuPDF.
-3. Engine ⑪ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
+2. A Python script runs all 14 heuristic engines (including ExifTool, qpdf, YARA, and PeePDF) against the raw bytes and parsed object graph via PyMuPDF.
+3. Engine ⑮ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
 4. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score.
 5. The client renders a five-tab report: Summary, Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
 
@@ -93,7 +93,7 @@ Each indicator contributes base points multiplied by `min(count, 3)`:
 | Medium | 10 |
 | Low | 3 |
 
-The Correlation Engine (⑩) adds weighted bonus points (35–100) on top for dangerous indicator combinations. Final score is capped at 999.
+The Correlation Engine (⑭) adds weighted bonus points (35–100) on top for dangerous indicator combinations. Final score is capped at 999.
 
 | Score | Risk Level |
 |---|---|
@@ -224,9 +224,62 @@ Collects document-level statistics via PyMuPDF for the 15-cell summary dashboard
 | Total streams | From Engine ③ |
 | High-entropy streams | From Engine ③ |
 
-### Engine ⑩ — Correlation Engine
+### Engine ⑩ — ExifTool Metadata Forensics
 
-Cross-references all findings from Engines ①–⑨ and scores 20+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
+Runs `exiftool -PDF:all -XMP:all` to extract metadata layers that are invisible to PyMuPDF's document model:
+
+- **Exploit-kit fingerprinting** — scans Creator, Producer, Author, Subject, Keywords, and XMPToolkit fields for known exploit-tool strings: Metasploit, msfvenom, Canvas, Core Impact, shellcode, payload, pdfcrack, dompdf exploit
+- **XFA confirmation** — independently verifies `HasXFA` from EXIF metadata (cross-check against Engine ④)
+- **Embedded attachment detection** — surfaces `EmbeddedFileSize` / `EmbeddedFile` fields visible only via EXIF layer
+- **Summary export** — Creator, Producer, CreateDate, ModifyDate, PDFVersion, Linearized, PageCount, HasXFA, and Encryption exported to the structure dictionary for the Metadata tab
+- **Feeds Correlation Engine** — sets `exiftool_exploit_found` flag used by Engine ⑭ for compound scoring
+
+### Engine ⑪ — qpdf Structural Integrity
+
+Runs `qpdf --check` to validate cross-reference tables, trailer dictionaries, and overall document structure:
+
+- **XRef reconstruction** — if qpdf must reconstruct the xref table, reports as High risk (deliberately broken xref is a common technique to hide exploit objects from basic parsers while still rendering in vulnerable viewers)
+- **Damaged structure** — explicit "damaged" report from qpdf is flagged as High risk (intentional corruption to conceal exploit content from scanners)
+- **Structural errors** — other qpdf errors flagged as Medium risk (up to 3× count multiplier)
+- **Structural warnings** — minor anomalies flagged as Low risk
+- **Status export** — `qpdf_status` (ok / warnings / errors / damaged) exported to structure dictionary
+- **Feeds Correlation Engine** — sets `qpdf_damaged` flag used by Engine ⑭ for compound scoring
+
+### Engine ⑫ — YARA Rule Engine
+
+Compiles and matches 11 custom YARA rules targeting PDF-specific attack byte patterns — independent of PDF structure parsing:
+
+| Rule | Detects |
+|---|---|
+| `PDF_Heapspray_Classic` | `%u9090%u9090`, `\u9090\u9090`, `%u0c0c%u0c0c`, `\u0c0c\u0c0c`, `%u0d0d%u0d0d`, binary 16-byte NOP sled, `0x0c0c0c0c` |
+| `PDF_JS_Shellcode_Loader` | `eval()+unescape()`, `eval()+String.fromCharCode`, `unescape()+String.fromCharCode` combinations |
+| `PDF_CVE_2009_0658` | `/JBIG2Decode` combined with `/JavaScript` or `/OpenAction` at byte level |
+| `PDF_CVE_2008_2992` | `util.printf` and `%8999999999` format-string overflow patterns |
+| `PDF_Suspicious_Launch` | `/S /Launch` and `/S/Launch` direct byte patterns |
+| `PDF_AutoOpen_Executable` | `/OpenAction` combined with `/JavaScript`, `/Launch`, or `/EmbeddedFile` |
+| `PDF_Obfuscated_Hex_Keywords` | `#6A#61#76#61` ("java" hex), `#65#76#61#6C` ("eval" hex) — PDF name obfuscation |
+| `PDF_XFA_Script_Exploit` | `/XFA` combined with `/JavaScript` or `<script` |
+| `PDF_RichMedia_Vector` | `/RichMedia`, or `.swf`+`Flash` combo |
+| `PDF_AA_Malicious_Trigger` | `/AA` combined with `/JavaScript` or `/Launch` |
+| `PDF_Encoder_Chain` | Any 3 of `/ASCII85Decode`, `/ASCIIHexDecode`, `/RunLengthDecode`, `/LZWDecode` |
+
+- **Byte-level independence** — YARA scans raw file bytes, bypassing PDF parser layers entirely; catches patterns hidden in object streams
+- **Feeds Correlation Engine** — populates `yara_hits` set used by Engine ⑭ for compound scoring
+
+### Engine ⑬ — PeePDF Deep Analysis
+
+Parses the full PDF object tree using the PeePDF framework — an entirely independent parser from PyMuPDF:
+
+- **Vulnerability patterns** — PeePDF's built-in vulnerability detector flags known CVE pattern combinations; each confirmed pattern reported as Critical
+- **Suspicious element location** — reports exact object IDs for dangerous elements from both `Suspicious elements` and `Dangerous elements` dictionaries: `/Launch`, `getIcon()`, `printf()`, `unescape()`, `exportDataObject()`, `submitForm()`, `/EmbeddedFile`, `/JS`, `/JavaScript`, `eval()`, `/OpenAction`, `/AA`, `/XFA`, `/URI`
+- **JavaScript object inventory** — lists all PDF object IDs containing JavaScript
+- **Independent verification** — cross-checks PyMuPDF-based findings; if both parsers flag the same element, the compound risk in Engine ⑭ is elevated
+- **Summary export** — PDF version, object count, stream count, and vulnerability count exported to structure dictionary
+- **Feeds Correlation Engine** — sets `peepdf_vuln_count` used by Engine ⑭ for compound scoring
+
+### Engine ⑭ — Correlation Engine
+
+Cross-references all findings from Engines ①–⑬ and scores 30+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
 
 **Auto-execution combinations (highest danger)**
 
@@ -268,9 +321,33 @@ Cross-references all findings from Engines ①–⑨ and scores 20+ dangerous in
 | `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
 | Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
 
+**Metadata & structure combinations**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Empty metadata + JavaScript | +35 | Stripped attribution + active scripting = crafted exploit profile |
+| Empty metadata + `/EmbeddedFile` | +20 | Dropper PDFs strip metadata to avoid reputation-based triggers |
+| `/OpenAction` + `/EmbeddedFile` | +45 | Auto-triggered file drop on open — no JavaScript required |
+| `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
+| Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
+
+**Cross-engine compound patterns (Engines ⑩–⑬ → ⑭)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| qpdf structural damage + JavaScript | +70 | Broken xref/trailer hides JS exploit objects from most parsers |
+| qpdf structural damage + `/Launch` or `/EmbeddedFile` | +65 | Structurally concealed executable delivery payload |
+| ExifTool exploit-kit fingerprint + JavaScript | +80 | Known exploit tool generated this document; active JS confirms intent |
+| ExifTool exploit-kit fingerprint + `/Launch` or `/EmbeddedFile` | +75 | Exploit-kit-generated dropper PDF confirmed |
+| Multiple YARA critical rules (≥2) | +60–90 | Stacked YARA critical hits confirm active malicious document (scales with count) |
+| YARA heap-spray + JavaScript | +50 | Byte-level corroboration of heap-spray+JS delivery chain |
+| YARA shellcode loader + auto-exec trigger | +70 | Complete exploit chain confirmed: load → execute |
+| PeePDF vulnerability + JavaScript | +55–85 | Cross-engine vulnerability confirmation (scales with vuln count) |
+| PeePDF vulnerability + heap-spray | +65 | Full memory-corruption exploit chain confirmed by independent parser |
+
 **Dampening:** isolated `/OpenAction` with no JavaScript, no `/Launch`, no embedded files, no heapspray, no XFA, and no RichMedia has its score reduced by 7 points — `/OpenAction` alone is common in legitimate PDFs for navigation and zoom.
 
-### Engine ⑪ — ClamAV Signature Scanner
+### Engine ⑮ — ClamAV Signature Scanner
 
 Runs the local ClamAV daemon against the PDF and reports any signature matches:
 
@@ -278,7 +355,7 @@ Runs the local ClamAV daemon against the PDF and reports any signature matches:
 - **Method** — calls `clamdscan --no-summary --fdpass <path>` to pass the open file descriptor directly to the `clamd` daemon, avoiding filesystem permission issues and reusing the already-loaded in-memory signature database for speed (~50–200 ms per scan)
 - **Fallback** — if the daemon returns an error (exit code 2), falls back automatically to `clamscan` (in-process load, ~2–5 s)
 - **Results** — exit code 0 = clean (engine recorded in `engines_run`, no indicator added); exit code 1 = match found, signature name extracted from output and reported as Critical; exit code 2 = scanner error, recorded in `structure.clamav_error`
-- **Distinction** — Engines ①–⑩ use heuristics and structural analysis to catch zero-days and novel exploits; Engine ⑪ provides authoritative signature intelligence for confirmed known threats. A ClamAV match means the file is an identified, named malware sample in the global signature database.
+- **Distinction** — Engines ①–⑭ use heuristics and structural analysis to catch zero-days and novel exploits; Engine ⑮ provides authoritative signature intelligence for confirmed known threats. A ClamAV match means the file is an identified, named malware sample in the global signature database.
 
 ### Report Tabs
 
@@ -547,7 +624,7 @@ Additional parameter: `font_style`
 | Styling | Vanilla CSS (CSS variables, Grid, custom animations) |
 | Scripts | Vanilla ES6 JavaScript modules (`type="module"`, no framework) |
 | PDF engines | Ghostscript, Poppler, qpdf, LibreOffice, PyMuPDF, ImageMagick |
-| Threat scanning | PyMuPDF (heuristic engines ①–⑩), ClamAV 1.4+ with daily signature updates (engine ⑪) |
+| Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), Correlation (⑭), ClamAV 1.4+ (⑮) |
 | PQC crypto | `@noble/post-quantum` |
 | PDF.js | Mozilla PDF.js (page preview rendering, DPI preview, content scanning, corruption diagnostics) |
 | Colour theme | Amber `#ff8c00` + gold `#ffd700` on deep navy `#040810` |
@@ -608,7 +685,7 @@ pdf/
 └── tools/                     # PHP tool pages
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
-    ├── scan.php               # PDF Threat Scanner — 11-engine static analysis + sanitize
+    ├── scan.php               # PDF Threat Scanner — 15-engine static analysis + sanitize
     ├── merge.php
     ├── split.php
     ├── compress.php
