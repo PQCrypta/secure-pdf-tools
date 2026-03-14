@@ -15,7 +15,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 | Tool | Link | Description |
 |---|---|---|
-| **Merge PDFs** | [/pdf/tools/merge.php](https://pqcrypta.com/pdf/tools/merge.php) | Combine up to 20 PDFs into one. Drag thumbnails to reorder pages before merging. |
+| **Merge PDFs** | [/pdf/tools/merge.php](https://pqcrypta.com/pdf/tools/merge.php) | Combine up to 20 PDFs into one (200 MB total). Drag thumbnails to reorder pages before merging. Upload progress shows real-time percentage; once upload completes, server phase cycles through descriptive status messages. |
 | **Split PDF** | [/pdf/tools/split.php](https://pqcrypta.com/pdf/tools/split.php) | Split by every page, fixed interval, custom page ranges, or interactive cut-point selection. |
 | **Reorder Pages** | [/pdf/tools/reorder.php](https://pqcrypta.com/pdf/tools/reorder.php) | Drag-and-drop page thumbnails to rearrange, then export. |
 | **Delete Pages** | [/pdf/tools/delete-pages.php](https://pqcrypta.com/pdf/tools/delete-pages.php) | Click thumbnail grid to select pages for removal. |
@@ -85,7 +85,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 7. Engine ⑲ scans every stream (raw and decompressed) for file magic byte signatures — ZIP, Windows PE, Linux ELF, Mach-O, Java class, OLE/CFBF, RAR, 7-Zip, embedded PostScript — to detect polyglot files that embed executable droppers inside a valid PDF container.
 8. Engine ⑳ extracts JavaScript from `/JS` literals and keyword-bearing compressed streams, parses each through the Acorn AST parser, and walks the AST detecting obfuscation constructs invisible to text-pattern matching: `eval()` chains, `String.fromCharCode()` arrays (shellcode staging), `unescape()` decode pipelines, large numeric arrays (heap spray), and `new Function()` dynamic construction.
 9. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score and ML malicious-probability score.
-10. The client renders a five-tab report: Summary (ML panel with probability bar, explainable feature importance, and feedback buttons; differential parsing panel; polyglot panel; AST deobfuscation panel), Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
+10. The client renders an eight-tab report: Summary, 🧠 ML (probability bar, explainable feature importance, feedback), 🔬 Parsing (differential parser comparison), 🧬 Polyglot (magic-byte + AST deobfuscation), Threats, URLs, Streams, Metadata. Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip shows each engine completing in sequence during the upload.
 
 ### Scoring
 
@@ -801,8 +801,8 @@ pdf/
 │   ├── pdf-page-preview.js    # Shared ES module: PdfPagePreview, PdfSplitPreview, PdfReorderPreview, PdfMergePreview, renderSinglePagePreview
 │   └── tools/                 # All tool scripts are ES modules (type="module")
 │       ├── upload.js          # PdfUploadUtil — shared XHR upload handler
-│       ├── scan.js            # Threat scanner — engine strip animation, 5-tab report renderer, ML panel (probability bar, explainable feature importance, feedback), differential parsing panel, polyglot panel, JS AST panel, sanitize flow
-│       ├── merge.js           # Thumbnail preview + drag reorder
+│       ├── scan.js            # Threat scanner — engine strip animation, 8-tab report renderer (Summary/ML/Parsing/Polyglot/Threats/URLs/Streams/Metadata), clickable stat cards, ML panel (probability bar, explainable feature importance, feedback), differential parsing panel, polyglot panel, JS AST panel, sanitize flow
+│       ├── merge.js           # Thumbnail preview + drag reorder; upload progress bar; server-phase cycling status messages (6 rotating messages while Ghostscript merges)
 │       ├── split.js           # Cut-point preview + range/interval modes
 │       ├── compress.js        # DPI slider, before/after split-canvas preview, size comparison
 │       ├── convert.js         # PDF → Word/ODT/RTF/TXT + format fidelity star indicator
