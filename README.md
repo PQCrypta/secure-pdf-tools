@@ -44,7 +44,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Static, dynamic, and ML analysis across 17 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, ClamAV signature scanning (700k+ signatures), and ML Intelligence Engine (IsolationForest anomaly detection + RandomForest classifier with Bayesian contextual scoring and continuous learning). Returns a scored threat report with per-indicator context, URL list, stream entropy table, ML probability score, and sanitize options. |
+| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Static, dynamic, and ML analysis across 20 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, ClamAV signature scanning (700k+ signatures), ML Intelligence Engine (IsolationForest + RandomForest + Bayesian contextual scoring), differential parser comparison (PyMuPDF vs pdfminer vs qpdf), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, OLE and more), and JavaScript AST deobfuscation (acorn). Returns a scored threat report with per-indicator context and sanitize options. |
 | **Protect PDF** | [/pdf/tools/protect.php](https://pqcrypta.com/pdf/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/pdf/tools/unlock.php](https://pqcrypta.com/pdf/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/pdf/tools/redact.php](https://pqcrypta.com/pdf/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
@@ -503,13 +503,18 @@ Extracts all JavaScript from the PDF (inline `/JS` literal strings and compresse
 
 ### Report Tabs
 
+The tab bar uses a pill-style design with background highlighting on hover and an amber-tinted active state. Stat cards for **Threats Found**, **URLs Found**, and **Total Streams** are clickable — clicking navigates directly to the corresponding tab and smooth-scrolls the panel into view.
+
 | Tab | Contents |
 |---|---|
-| **Summary** | Risk banner (Clean / Low / Suspicious / Dangerous), composite score meter (0–999), 15-cell stats grid, engines-completed pill list, ML Intelligence panel (probability bar, model version, contextual note, Explainable ML feature importance chart, feedback buttons), Differential Parsing panel (per-parser page/object/JS comparison table, mismatch badges), Polyglot Detection panel (magic byte hits with risk badges), JS AST Deobfuscation panel (obfuscation findings with descriptions), top 5 threats preview |
-| **Threats** | All indicators grouped by risk level (Critical → High → Medium → Low), each showing badge, key, description, count, engine attribution, and byte-context snippet |
-| **URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
-| **Streams** | Table of up to 40 streams: xref number, type, decompressed size, Shannon entropy with inline bar chart, suspicious status, matched pattern list |
-| **Metadata** | Document metadata KV table (title, author, subject, keywords, creator, producer, dates, format, XMP flag) + structure info KV table (version, EOF markers, xref tables, linearized, binary comment, stream counts) |
+| **📊 Summary** | Risk banner (Clean / Low Risk / Suspicious / High Risk / Dangerous), composite score meter (0–999), 15-cell stats grid (clickable Threats/URLs/Streams cards), engines-completed pill strip, top 5 threats preview with link to full Threats tab |
+| **⚠️ Threats** | All indicators grouped by risk level (Critical → High → Medium → Low), each showing badge, key, description, count, engine attribution, and byte-context snippet |
+| **🌐 URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
+| **📦 Streams** | Table of displayed streams (top 40 of N total; explains decompressed count vs skipped images/fonts). Columns: xref, type, decompressed size, Shannon entropy bar, suspicious flag, matched pattern list. Suspicious streams highlighted in amber. |
+| **🧠 ML** | ML Intelligence Engine panel: malicious probability bar, model version, contextual dampening/amplification note, Explainable ML feature importance chart, false-positive / confirm-threat feedback buttons. Tab badge shows current malicious % score. |
+| **🔬 Parsing** | Differential Parsing Detection panel: per-parser (PyMuPDF / pdfminer / qpdf) page count, object count, JavaScript detection, embedded file count. Mismatch badges highlight discrepancies that indicate parser-evasion attacks. |
+| **🧬 Polyglot** | Polyglot/Embedded Binary Detection panel (magic-byte hits with type and risk badge) + JavaScript AST Deobfuscation panel (obfuscation findings — dynamic eval, fromCharCode arrays, unescape calls, large numeric arrays, new Function). |
+| **🏷️ Metadata** | Document metadata KV table (title, author, subject, keywords, creator, producer, dates, format, XMP flag) + structure info KV table (version, EOF markers, xref tables, linearized, binary comment, stream counts) |
 
 ### Sanitize Options
 
