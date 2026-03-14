@@ -68,11 +68,11 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 ---
 
-## PDF Threat Scanner — 17 Detection Engines
+## PDF Threat Scanner — 20 Detection Engines
 
 [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php)
 
-15 static analysis engines, one dynamic behavioral sandbox, and an ML Intelligence Engine — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing, and every scan is persisted to PostgreSQL to continuously improve the ML models. All 17 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
+15 static analysis engines, one dynamic behavioral sandbox, an ML Intelligence Engine, a differential parsing engine, a polyglot/embedded binary detector, and a JavaScript AST deobfuscation engine — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing, and every scan is persisted to PostgreSQL to continuously improve the ML models. All 20 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
 
 ### How It Works
 
@@ -80,9 +80,12 @@ Every operation runs entirely on the server. Files are processed and immediately
 2. A Python script runs all 13 static heuristic engines (including ExifTool, qpdf, YARA, and PeePDF) against the raw bytes and parsed object graph via PyMuPDF.
 3. Engine ⑭ renders the PDF through Ghostscript, MuPDF, and Poppler inside isolated Linux namespaces (`unshare --net --pid --mount`) with all syscalls captured by `strace`. Detects runtime behavior invisible to static analysis.
 4. Engine ⑯ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
-5. Engine ⑰ extracts a 38-feature vector from all preceding engine outputs, applies Bayesian contextual scoring, runs IsolationForest anomaly detection (unsupervised — works from scan 1), and RandomForest classification (activates at ≥50 labeled samples). Scan features, scores, and auto-inferred labels are persisted to PostgreSQL. Training runs every 30 minutes via cron.
-6. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score and ML malicious-probability score.
-7. The client renders a five-tab report: Summary (with ML panel), Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
+5. Engine ⑰ extracts a 38-feature vector from all preceding engine outputs, applies Bayesian contextual scoring, runs IsolationForest anomaly detection (unsupervised — works from scan 1), and RandomForest classification (activates at ≥50 labeled samples). Reports per-scan feature importance (Explainable ML). Scan features, scores, and auto-inferred labels are persisted to PostgreSQL. Training runs every 30 minutes via cron.
+6. Engine ⑱ re-runs MuPDF (`mutool`), Poppler (`pdfinfo`/`pdfdetach`), and Ghostscript independently and compares page counts, object counts, JavaScript presence, and embedded file counts. Parser disagreement signals hidden objects, shadow object trees, or deliberate parser-confusion exploits.
+7. Engine ⑲ scans every stream (raw and decompressed) for file magic byte signatures — ZIP, Windows PE, Linux ELF, Mach-O, Java class, OLE/CFBF, RAR, 7-Zip, embedded PostScript — to detect polyglot files that embed executable droppers inside a valid PDF container.
+8. Engine ⑳ extracts JavaScript from `/JS` literals and keyword-bearing compressed streams, parses each through the Acorn AST parser, and walks the AST detecting obfuscation constructs invisible to text-pattern matching: `eval()` chains, `String.fromCharCode()` arrays (shellcode staging), `unescape()` decode pipelines, large numeric arrays (heap spray), and `new Function()` dynamic construction.
+9. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score and ML malicious-probability score.
+10. The client renders a five-tab report: Summary (ML panel with probability bar, explainable feature importance, and feedback buttons; differential parsing panel; polyglot panel; AST deobfuscation panel), Threats, URLs, Streams, Metadata. An animated engine-chip strip shows each engine completing in sequence during the upload.
 
 ### Scoring
 
@@ -436,15 +439,73 @@ High-confidence signals automatically label scan records for training: ClamAV si
 
 Training cron (`*/30 * * * * python3 /var/www/html/public/pdf/ml/train.py`) retrains both models every 30 minutes. Models saved to `/pdf/ml/models/` as `.pkl` files via `joblib`. Metadata (sample counts, contamination, CV AUC) persisted to `meta.json`.
 
+**Explainable ML**
+
+When the RandomForest model is active, the per-scan feature importance is computed: for each of the 38 features, the model's `feature_importances_` is multiplied by the feature's presence in the current scan. Top 8 non-zero contributing features are returned as `ml_feature_importance` and rendered as a proportional bar chart in the ML panel.
+
 **Result display**
 
-The Summary tab shows a lime ML panel: malicious probability bar (0–100%), model version, contextual adjustment note, and false-positive / confirm-threat feedback buttons. Feedback POSTs `scan_id` + `feedback` to `api.php?operation=pdf-scan-feedback`.
+The Summary tab shows a lime ML panel: malicious probability bar (0–100%), model version, contextual adjustment note, Explainable ML feature importance chart (top contributing features), and false-positive / confirm-threat feedback buttons. Feedback POSTs `scan_id` + `feedback` to `api.php?operation=pdf-scan-feedback`.
+
+### Engine ⑱ — Differential Parsing Detection
+
+Runs three independent PDF parsers against the same file and compares their structural interpretation:
+
+| Parser | Tool | Data extracted |
+|---|---|---|
+| MuPDF | `mutool show xref` / `mutool info` | Object count (from xref slot count), page count, JavaScript in trailer |
+| Poppler | `pdfinfo` / `pdfdetach -list` | Page count, JavaScript yes/no, embedded file count, encryption status |
+| Ghostscript | `gs -sDEVICE=ps2write -sOutputFile=-` | Page count (from `%%Page:` markers), JavaScript in output |
+
+**Flags raised:**
+
+- **Page count disagreement** (any difference) → High + 35 pts — indicates hidden incremental update, shadow object tree, or parser-confusion exploit
+- **JavaScript visibility discrepancy** (JS visible to some parsers, not others) → Critical + 50 pts — hidden JS behind parser-specific quirks (duplicate object IDs, broken references, malformed stream boundaries)
+- **Object count discrepancy >10%** (MuPDF vs any) → Medium + 20 pts — duplicate object numbers or hidden objects in compressed object streams
+
+**Why it matters:** Attackers craft PDFs where one parser recovers hidden exploit objects that another ignores entirely. Standard single-parser scanners miss this by design. This is the same technique used by browser security teams comparing Chromium vs Firefox DOM construction.
+
+### Engine ⑲ — Polyglot / Embedded Binary Detection
+
+Scans every PDF stream — both raw bytes and decompressed (zlib inflate, raw deflate) — for file magic byte signatures:
+
+| Signature | Format | Risk | Score |
+|---|---|---|---|
+| `PK\x03\x04` | ZIP archive | Medium | +15 |
+| `MZ` | Windows PE executable | Critical | +70 |
+| `\x7fELF` | Linux ELF binary | Critical | +70 |
+| `\xcf\xfa\xed\xfe` | Mach-O binary (x64 LE) | Critical | +70 |
+| `\xfe\xed\xfa\xce` | Mach-O binary (x86) | Critical | +70 |
+| `\xca\xfe\xba\xbe` | Java class file | High | +40 |
+| `\xd0\xcf\x11\xe0` | OLE/CFBF (Office binary) | High | +35 |
+| `%!PS-Adobe` | Embedded PostScript | Medium | +20 |
+| `Rar!\x1a\x07` | RAR archive | Medium | +12 |
+| `7z\xbc\xaf\x27\x1c` | 7-Zip archive | Medium | +12 |
+| `<script` | Embedded HTML script | Medium | +15 |
+
+Polyglot files simultaneously satisfy the format rules of two or more file types. The PDF appears valid to all viewers while also containing a self-extracting archive or executable dropper that activates when saved to disk and opened by a compatible application. Used to smuggle payloads past content-type-based security controls.
+
+### Engine ⑳ — JavaScript AST Deobfuscation
+
+Extracts all JavaScript from the PDF (inline `/JS` literal strings and compressed streams containing `eval`, `unescape`, `String.fromCharCode`, `app.`, or `this.getField` keywords). Each fragment is passed through **Acorn** (a production JavaScript parser used by Babel and webpack) to build a full AST. The walker detects:
+
+| Pattern | AST node | Risk | Score |
+|---|---|---|---|
+| `eval()` / `execScript()` / `Function()` call | `CallExpression` with matching callee | High | +30 |
+| `String.fromCharCode(x, x, x, ...)` with >30 args | `CallExpression` on `String.fromCharCode` | High | +25 |
+| `unescape()` call | `CallExpression` with name `unescape` | Medium | +15 |
+| Array of 150+ numeric literals | `ArrayExpression` with all-numeric `Literal` elements | High | +30 |
+| `new Function(string)` | `NewExpression` with callee `Function` | High | +35 |
+
+**Why AST over patterns:** Text-pattern scanners look for the string `eval`. Obfuscated payloads spell it as `e\u0076al`, `window['ev'+'al']`, or build it via `String.fromCharCode`. The AST sees the *meaning* — a `CallExpression` with a callee named `eval` — regardless of how the source was written. Up to 6 fragments are analyzed per scan; each run is capped at 60 KB.
+
+**Dependency:** `acorn` (npm, `/var/www/html/node_modules/acorn/`). Invoked as a Node.js subprocess.
 
 ### Report Tabs
 
 | Tab | Contents |
 |---|---|
-| **Summary** | Risk banner (Clean / Low / Suspicious / Dangerous), composite score meter (0–999), 15-cell stats grid, engines-completed pill list, ML Intelligence panel (probability bar, model version, contextual note, feedback buttons), top 5 threats preview |
+| **Summary** | Risk banner (Clean / Low / Suspicious / Dangerous), composite score meter (0–999), 15-cell stats grid, engines-completed pill list, ML Intelligence panel (probability bar, model version, contextual note, Explainable ML feature importance chart, feedback buttons), Differential Parsing panel (per-parser page/object/JS comparison table, mismatch badges), Polyglot Detection panel (magic byte hits with risk badges), JS AST Deobfuscation panel (obfuscation findings with descriptions), top 5 threats preview |
 | **Threats** | All indicators grouped by risk level (Critical → High → Medium → Low), each showing badge, key, description, count, engine attribution, and byte-context snippet |
 | **URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
 | **Streams** | Table of up to 40 streams: xref number, type, decompressed size, Shannon entropy with inline bar chart, suspicious status, matched pattern list |
@@ -735,7 +796,7 @@ pdf/
 │   ├── pdf-page-preview.js    # Shared ES module: PdfPagePreview, PdfSplitPreview, PdfReorderPreview, PdfMergePreview, renderSinglePagePreview
 │   └── tools/                 # All tool scripts are ES modules (type="module")
 │       ├── upload.js          # PdfUploadUtil — shared XHR upload handler
-│       ├── scan.js            # Threat scanner — engine strip animation, 5-tab report renderer, ML panel, sanitize flow
+│       ├── scan.js            # Threat scanner — engine strip animation, 5-tab report renderer, ML panel (probability bar, explainable feature importance, feedback), differential parsing panel, polyglot panel, JS AST panel, sanitize flow
 │       ├── merge.js           # Thumbnail preview + drag reorder
 │       ├── split.js           # Cut-point preview + range/interval modes
 │       ├── compress.js        # DPI slider, before/after split-canvas preview, size comparison
@@ -775,10 +836,11 @@ pdf/
 │       ├── random_forest.pkl      # Supervised classifier (written once ≥50 labeled samples)
 │       ├── scaler.pkl             # StandardScaler fitted on training data
 │       └── meta.json              # Sample counts, contamination rate, CV AUC, feature key list
+├── node_modules/acorn/        # JS AST parser for Engine ⑳ (npm install acorn)
 └── tools/                     # PHP tool pages
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
-    ├── scan.php               # PDF Threat Scanner — 17-engine static + dynamic + ML analysis + sanitize
+    ├── scan.php               # PDF Threat Scanner — 20-engine static + dynamic + ML + differential + polyglot + AST analysis + sanitize
     ├── merge.php
     ├── split.php
     ├── compress.php
