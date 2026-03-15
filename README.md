@@ -64,7 +64,7 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 | Tool | Link | Description |
 |---|---|---|
-| **Workflow Builder** | [/pdf/tools/workflow.php](https://pqcrypta.com/pdf/tools/workflow.php) | Chain operations visually: add steps from the picker, configure per-step parameters, drag to reorder. Save named workflows to localStorage; **Load** replaces current steps, **+ Append** joins a saved workflow onto the end of the current one — enabling complex pipelines composed from saved building blocks. Export / import workflows as JSON. Runs the full sequence on one or more uploaded PDFs. |
+| **Workflow Builder** | [/pdf/tools/workflow.php](https://pqcrypta.com/pdf/tools/workflow.php) | Chain operations visually: add steps from the picker, configure per-step parameters, drag to reorder. Supported steps: rotate, compress, watermark, protect, unlock, grayscale, flatten, repair, extract pages, delete pages, reorder pages, convert to PDF/A, **sign** (typed visual / typed visual + digital / digital-only with auto self-signed cert), **redact** (permanent text-pattern removal, case-sensitive option, black or white fill), and **split every N pages** (terminal step — outputs a ZIP of equal-sized PDF chunks, useful for batch-scanned documents). Save named workflows to localStorage; **Load** replaces current steps, **+ Append** joins a saved workflow onto the end of the current one — enabling complex pipelines composed from saved building blocks. Export / import workflows as JSON. Runs the full sequence on one or more uploaded PDFs. |
 
 ---
 
@@ -830,7 +830,7 @@ pdf/
 │       ├── redact.js          # Text patterns + region drawing mode
 │       ├── compare.js         # Side-by-side page 1 canvas previews, DPI + sensitivity controls
 │       ├── edit.js            # 15-tool canvas editor, eraser, duplicate page, first/last nav, right-click thumbnail context menu, session timer
-│       └── workflow.js        # Visual step builder, drag reorder
+│       └── workflow.js        # Visual step builder, drag reorder; 15 step types incl. sign (3 modes), redact, split-every-N (ZIP output)
 ├── scripts/                   # Python helpers (server-side operations)
 │   ├── pdf_to_excel.py        # Table extraction helper (PyMuPDF + openpyxl)
 │   └── url_to_pdf.cjs         # URL-to-PDF conversion helper (Node.js)
