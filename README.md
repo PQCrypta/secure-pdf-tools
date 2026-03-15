@@ -5,7 +5,7 @@ No uploads to third-party clouds. No accounts. No tracking. Ever.
 
 Every operation runs entirely on the server. Files are processed and immediately deleted — nothing is stored, logged, or shared.
 
-**Live:** [pqcrypta.com/pdf](https://pqcrypta.com/pdf)
+**Live:** [pqpdf.com](https://pqpdf.com)
 
 ---
 
@@ -35,57 +35,57 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 
 | Tool | Link | Description |
 |---|---|---|
-| **Merge PDFs** | [/pdf/tools/merge.php](https://pqcrypta.com/pdf/tools/merge.php) | Combine up to 20 PDFs into one (200 MB total). Drag thumbnails to reorder pages before merging. Upload progress shows real-time percentage; once upload completes, server phase cycles through descriptive status messages. |
-| **Split PDF** | [/pdf/tools/split.php](https://pqcrypta.com/pdf/tools/split.php) | Split by every page, fixed interval, custom page ranges, or interactive cut-point selection. |
-| **Reorder Pages** | [/pdf/tools/reorder.php](https://pqcrypta.com/pdf/tools/reorder.php) | Drag-and-drop page thumbnails to rearrange, then export. |
-| **Delete Pages** | [/pdf/tools/delete-pages.php](https://pqcrypta.com/pdf/tools/delete-pages.php) | Click thumbnail grid to select pages for removal. |
-| **Extract Pages** | [/pdf/tools/extract-pages.php](https://pqcrypta.com/pdf/tools/extract-pages.php) | Click thumbnail grid to select pages to keep; auto-compresses ranges (e.g. 1-3,5,7-9). |
-| **Rotate Pages** | [/pdf/tools/rotate.php](https://pqcrypta.com/pdf/tools/rotate.php) | Rotate all, odd, even, or a custom range of pages. Supports 90°/180°/270° and arbitrary decimal angles. Live canvas preview of the first page. |
-| **Compress PDF** | [/pdf/tools/compress.php](https://pqcrypta.com/pdf/tools/compress.php) | Five quality presets plus custom DPI slider (50–600). Optional metadata stripping, linearization, and stream recompression. Live before/after split-canvas preview rendered from page 1 when a file is selected — original on the left, simulated compressed on the right. Shows original vs. compressed size after download. |
-| **Repair PDF** | [/pdf/tools/repair.php](https://pqcrypta.com/pdf/tools/repair.php) | Reconstruct corrupted or malformed PDFs via Ghostscript. On upload, PDF.js diagnoses the file client-side: checks the PDF header, attempts to parse the cross-reference table and content streams, and renders pages 1–3. A scan card reports detected issues (xref errors, stream corruption, truncation, encryption) as red badges — or confirms the file is readable with a green badge and page count. |
-| **Flatten PDF** | [/pdf/tools/flatten.php](https://pqcrypta.com/pdf/tools/flatten.php) | Flatten form fields, annotations, and layers into the page content layer. On upload, PDF.js scans the document client-side and shows a summary card — e.g. "3 form fields · 2 annotations · 1 layer — all will be made permanent" — with amber badges per element type. Shows a green "Already flat" badge if no interactive elements are found. |
-| **Grayscale / B&W** | [/pdf/tools/grayscale.php](https://pqcrypta.com/pdf/tools/grayscale.php) | Convert to grayscale or pure black-and-white. Live before/after split-canvas preview rendered from page 1 — color on the left, grayscale simulation on the right. |
+| **Merge PDFs** | [/pdf/tools/merge.php](https://pqpdf.com/pdf/tools/merge.php) | Combine up to 20 PDFs into one (200 MB total). Drag thumbnails to reorder pages before merging. Upload progress shows real-time percentage; once upload completes, server phase cycles through descriptive status messages. |
+| **Split PDF** | [/pdf/tools/split.php](https://pqpdf.com/pdf/tools/split.php) | Split by every page, fixed interval, custom page ranges, or interactive cut-point selection. |
+| **Reorder Pages** | [/pdf/tools/reorder.php](https://pqpdf.com/pdf/tools/reorder.php) | Drag-and-drop page thumbnails to rearrange, then export. |
+| **Delete Pages** | [/pdf/tools/delete-pages.php](https://pqpdf.com/pdf/tools/delete-pages.php) | Click thumbnail grid to select pages for removal. |
+| **Extract Pages** | [/pdf/tools/extract-pages.php](https://pqpdf.com/pdf/tools/extract-pages.php) | Click thumbnail grid to select pages to keep; auto-compresses ranges (e.g. 1-3,5,7-9). |
+| **Rotate Pages** | [/pdf/tools/rotate.php](https://pqpdf.com/pdf/tools/rotate.php) | Rotate all, odd, even, or a custom range of pages. Supports 90°/180°/270° and arbitrary decimal angles. Live canvas preview of the first page. |
+| **Compress PDF** | [/pdf/tools/compress.php](https://pqpdf.com/pdf/tools/compress.php) | Five quality presets plus custom DPI slider (50–600). Optional metadata stripping, linearization, and stream recompression. Live before/after split-canvas preview rendered from page 1 when a file is selected — original on the left, simulated compressed on the right. Shows original vs. compressed size after download. |
+| **Repair PDF** | [/pdf/tools/repair.php](https://pqpdf.com/pdf/tools/repair.php) | Reconstruct corrupted or malformed PDFs via Ghostscript. On upload, PDF.js diagnoses the file client-side: checks the PDF header, attempts to parse the cross-reference table and content streams, and renders pages 1–3. A scan card reports detected issues (xref errors, stream corruption, truncation, encryption) as red badges — or confirms the file is readable with a green badge and page count. |
+| **Flatten PDF** | [/pdf/tools/flatten.php](https://pqpdf.com/pdf/tools/flatten.php) | Flatten form fields, annotations, and layers into the page content layer. On upload, PDF.js scans the document client-side and shows a summary card — e.g. "3 form fields · 2 annotations · 1 layer — all will be made permanent" — with amber badges per element type. Shows a green "Already flat" badge if no interactive elements are found. |
+| **Grayscale / B&W** | [/pdf/tools/grayscale.php](https://pqpdf.com/pdf/tools/grayscale.php) | Convert to grayscale or pure black-and-white. Live before/after split-canvas preview rendered from page 1 — color on the left, grayscale simulation on the right. |
 
 ### Format Conversion
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF → Word** | [/pdf/tools/convert.php](https://pqcrypta.com/pdf/tools/convert.php) | Export to editable `.docx`, `.odt`, `.rtf`, or `.txt` via LibreOffice. Format fidelity indicator shows star ratings (out of 4) for all four formats, highlighting the active selection with a description of expected quality. |
-| **PDF → Excel** | [/pdf/tools/pdf-to-excel.php](https://pqcrypta.com/pdf/tools/pdf-to-excel.php) | Export tables to `.xlsx` via LibreOffice. |
-| **PDF → Images** | [/pdf/tools/to-images.php](https://pqcrypta.com/pdf/tools/to-images.php) | Render pages to PNG or JPEG at 72–600 DPI. Select all pages or a custom range. JPEG quality slider when JPEG format is chosen. Live DPI quality preview: page 1 is rendered in a canvas at the selected DPI immediately after upload; re-renders as you change the DPI setting, showing actual output pixel dimensions (e.g. "1240 × 1754 px at 150 DPI") before any server processing. Download as ZIP. |
-| **PDF/A Archive** | [/pdf/tools/pdfa.php](https://pqcrypta.com/pdf/tools/pdfa.php) | Convert to PDF/A-1b, PDF/A-2b, or PDF/A-3b for long-term archival. |
-| **Word → PDF** | [/pdf/tools/word-to-pdf.php](https://pqcrypta.com/pdf/tools/word-to-pdf.php) | Convert `.doc` / `.docx` / `.odt` via LibreOffice. Format fidelity indicator shows expected output quality for the uploaded file type. |
-| **Excel → PDF** | [/pdf/tools/excel-to-pdf.php](https://pqcrypta.com/pdf/tools/excel-to-pdf.php) | Convert `.xls` / `.xlsx` / `.ods` via LibreOffice. Sheet selector — fetches sheet names from the uploaded file and lets you pick which sheet(s) to convert. |
-| **PowerPoint → PDF** | [/pdf/tools/ppt-to-pdf.php](https://pqcrypta.com/pdf/tools/ppt-to-pdf.php) | Convert `.ppt` / `.pptx` / `.odp` via LibreOffice. Slide selector — fetches slide titles from the uploaded file and lets you choose which slides to include. |
-| **Images → PDF** | [/pdf/tools/image-to-pdf.php](https://pqcrypta.com/pdf/tools/image-to-pdf.php) | Pack JPEG / PNG / WebP / BMP / TIFF images into a single PDF via ImageMagick. |
-| **HTML → PDF** | [/pdf/tools/html-to-pdf.php](https://pqcrypta.com/pdf/tools/html-to-pdf.php) | Upload `.html` / `.htm` and convert via LibreOffice. |
+| **PDF → Word** | [/pdf/tools/convert.php](https://pqpdf.com/pdf/tools/convert.php) | Export to editable `.docx`, `.odt`, `.rtf`, or `.txt` via LibreOffice. Format fidelity indicator shows star ratings (out of 4) for all four formats, highlighting the active selection with a description of expected quality. |
+| **PDF → Excel** | [/pdf/tools/pdf-to-excel.php](https://pqpdf.com/pdf/tools/pdf-to-excel.php) | Export tables to `.xlsx` via LibreOffice. |
+| **PDF → Images** | [/pdf/tools/to-images.php](https://pqpdf.com/pdf/tools/to-images.php) | Render pages to PNG or JPEG at 72–600 DPI. Select all pages or a custom range. JPEG quality slider when JPEG format is chosen. Live DPI quality preview: page 1 is rendered in a canvas at the selected DPI immediately after upload; re-renders as you change the DPI setting, showing actual output pixel dimensions (e.g. "1240 × 1754 px at 150 DPI") before any server processing. Download as ZIP. |
+| **PDF/A Archive** | [/pdf/tools/pdfa.php](https://pqpdf.com/pdf/tools/pdfa.php) | Convert to PDF/A-1b, PDF/A-2b, or PDF/A-3b for long-term archival. |
+| **Word → PDF** | [/pdf/tools/word-to-pdf.php](https://pqpdf.com/pdf/tools/word-to-pdf.php) | Convert `.doc` / `.docx` / `.odt` via LibreOffice. Format fidelity indicator shows expected output quality for the uploaded file type. |
+| **Excel → PDF** | [/pdf/tools/excel-to-pdf.php](https://pqpdf.com/pdf/tools/excel-to-pdf.php) | Convert `.xls` / `.xlsx` / `.ods` via LibreOffice. Sheet selector — fetches sheet names from the uploaded file and lets you pick which sheet(s) to convert. |
+| **PowerPoint → PDF** | [/pdf/tools/ppt-to-pdf.php](https://pqpdf.com/pdf/tools/ppt-to-pdf.php) | Convert `.ppt` / `.pptx` / `.odp` via LibreOffice. Slide selector — fetches slide titles from the uploaded file and lets you choose which slides to include. |
+| **Images → PDF** | [/pdf/tools/image-to-pdf.php](https://pqpdf.com/pdf/tools/image-to-pdf.php) | Pack JPEG / PNG / WebP / BMP / TIFF images into a single PDF via ImageMagick. |
+| **HTML → PDF** | [/pdf/tools/html-to-pdf.php](https://pqpdf.com/pdf/tools/html-to-pdf.php) | Upload `.html` / `.htm` and convert via LibreOffice. |
 
 ### Protection & Security
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php) | Static, dynamic, and ML analysis across 20 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, ClamAV signature scanning (700k+ signatures), ML Intelligence Engine (IsolationForest + RandomForest + Bayesian contextual scoring), differential parser comparison (PyMuPDF vs pdfminer vs qpdf), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, OLE and more), and JavaScript AST deobfuscation (acorn). Returns a scored threat report with per-indicator context and sanitize options. |
-| **Protect PDF** | [/pdf/tools/protect.php](https://pqcrypta.com/pdf/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
-| **Unlock PDF** | [/pdf/tools/unlock.php](https://pqcrypta.com/pdf/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
-| **Redact PDF** | [/pdf/tools/redact.php](https://pqcrypta.com/pdf/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
+| **PDF Threat Scanner** | [/pdf/tools/scan.php](https://pqpdf.com/pdf/tools/scan.php) | Static, dynamic, and ML analysis across 20 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, ClamAV signature scanning (700k+ signatures), ML Intelligence Engine (IsolationForest + RandomForest + Bayesian contextual scoring), differential parser comparison (PyMuPDF vs pdfminer vs qpdf), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, OLE and more), and JavaScript AST deobfuscation (acorn). Returns a scored threat report with per-indicator context and sanitize options. |
+| **Protect PDF** | [/pdf/tools/protect.php](https://pqpdf.com/pdf/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
+| **Unlock PDF** | [/pdf/tools/unlock.php](https://pqpdf.com/pdf/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
+| **Redact PDF** | [/pdf/tools/redact.php](https://pqpdf.com/pdf/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
 
 ### Content & Annotation
 
 | Tool | Link | Description |
 |---|---|---|
-| **Add Watermark** | [/pdf/tools/watermark.php](https://pqcrypta.com/pdf/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
-| **Sign PDF** | [/pdf/tools/sign.php](https://pqcrypta.com/pdf/tools/sign.php) | Three signature input methods: draw (canvas with touch support), type (text-rendered), or upload an image. Place on first/last/custom page with x/y/size controls. Live placement preview: after drawing, typing, or uploading a signature, it is composited directly onto a rendered page 1 canvas at the chosen position and size — updates in real time as you move the position selectors or drag the size slider. Optional cryptographic metadata. |
-| **Edit PDF** | [/pdf/tools/edit.php](https://pqcrypta.com/pdf/tools/edit.php) | Full page-by-page visual editor with 15 annotation tools (see below). |
-| **Compare PDFs** | [/pdf/tools/compare.php](https://pqcrypta.com/pdf/tools/compare.php) | Visual diff of two PDFs. Configure DPI (72/96/150/300) and sensitivity. Side-by-side page 1 canvas previews render immediately when each file is selected. Outputs a highlighted diff PDF with change regions marked. |
-| **Extract Text** | [/pdf/tools/extract-text.php](https://pqcrypta.com/pdf/tools/extract-text.php) | Export all text to `.txt`. Options: layout preservation, text encoding, custom page range. |
-| **PDF Info** | [/pdf/tools/pdf-info.php](https://pqcrypta.com/pdf/tools/pdf-info.php) | Display full metadata: title, author, subject, keywords, creator, producer, page count, dimensions, PDF version, encryption status, form type, tagged flag, page rotation, fast web view optimisation, creation and modification dates, permission flags. Shows a quick canvas preview of page 1 alongside the metadata. |
-| **OCR PDF** | [/pdf/tools/ocr.php](https://pqcrypta.com/pdf/tools/ocr.php) | Optical Character Recognition for scanned and image-based PDFs. Powered by Tesseract 5 LSTM neural network. Three output formats: plain text (.txt), searchable PDF (original images + invisible text layer so the document becomes copyable and searchable), or a ZIP containing both. DPI control (150/200/300), four page segmentation modes (auto, single column, single block, sparse text), custom page ranges, up to 100 pages per job. Returns OCR confidence score (per-word Tesseract TSV confidence averaged across all pages), word count, and character count. Live text preview tab in the browser — preview extracted text without downloading. |
+| **Add Watermark** | [/pdf/tools/watermark.php](https://pqpdf.com/pdf/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
+| **Sign PDF** | [/pdf/tools/sign.php](https://pqpdf.com/pdf/tools/sign.php) | Three signature input methods: draw (canvas with touch support), type (text-rendered), or upload an image. Place on first/last/custom page with x/y/size controls. Live placement preview: after drawing, typing, or uploading a signature, it is composited directly onto a rendered page 1 canvas at the chosen position and size — updates in real time as you move the position selectors or drag the size slider. Optional cryptographic metadata. |
+| **Edit PDF** | [/pdf/tools/edit.php](https://pqpdf.com/pdf/tools/edit.php) | Full page-by-page visual editor with 15 annotation tools (see below). |
+| **Compare PDFs** | [/pdf/tools/compare.php](https://pqpdf.com/pdf/tools/compare.php) | Visual diff of two PDFs. Configure DPI (72/96/150/300) and sensitivity. Side-by-side page 1 canvas previews render immediately when each file is selected. Outputs a highlighted diff PDF with change regions marked. |
+| **Extract Text** | [/pdf/tools/extract-text.php](https://pqpdf.com/pdf/tools/extract-text.php) | Export all text to `.txt`. Options: layout preservation, text encoding, custom page range. |
+| **PDF Info** | [/pdf/tools/pdf-info.php](https://pqpdf.com/pdf/tools/pdf-info.php) | Display full metadata: title, author, subject, keywords, creator, producer, page count, dimensions, PDF version, encryption status, form type, tagged flag, page rotation, fast web view optimisation, creation and modification dates, permission flags. Shows a quick canvas preview of page 1 alongside the metadata. |
+| **OCR PDF** | [/pdf/tools/ocr.php](https://pqpdf.com/pdf/tools/ocr.php) | Optical Character Recognition for scanned and image-based PDFs. Powered by Tesseract 5 LSTM neural network. Three output formats: plain text (.txt), searchable PDF (original images + invisible text layer so the document becomes copyable and searchable), or a ZIP containing both. DPI control (150/200/300), four page segmentation modes (auto, single column, single block, sparse text), custom page ranges, up to 100 pages per job. Returns OCR confidence score (per-word Tesseract TSV confidence averaged across all pages), word count, and character count. Live text preview tab in the browser — preview extracted text without downloading. |
 
 ### Automation
 
 | Tool | Link | Description |
 |---|---|---|
-| **Workflow Builder** | [/pdf/tools/workflow.php](https://pqcrypta.com/pdf/tools/workflow.php) | Chain operations visually: add steps from the picker, configure per-step parameters, drag to reorder. Supported steps: rotate, compress, watermark, protect, unlock, grayscale, flatten, repair, extract pages, delete pages, reorder pages, convert to PDF/A, **sign** (typed visual / typed visual + digital / digital-only with auto self-signed cert), **redact** (permanent text-pattern removal, case-sensitive option, black or white fill), and **split every N pages** (terminal step — outputs a ZIP of equal-sized PDF chunks, useful for batch-scanned documents). Save named workflows to localStorage; **Load** replaces current steps, **+ Append** joins a saved workflow onto the end of the current one — enabling complex pipelines composed from saved building blocks. Export / import workflows as JSON. Runs the full sequence on one or more uploaded PDFs. |
+| **Workflow Builder** | [/pdf/tools/workflow.php](https://pqpdf.com/pdf/tools/workflow.php) | Chain operations visually: add steps from the picker, configure per-step parameters, drag to reorder. Supported steps: rotate, compress, watermark, protect, unlock, grayscale, flatten, repair, extract pages, delete pages, reorder pages, convert to PDF/A, **sign** (typed visual / typed visual + digital / digital-only with auto self-signed cert), **redact** (permanent text-pattern removal, case-sensitive option, black or white fill), and **split every N pages** (terminal step — outputs a ZIP of equal-sized PDF chunks, useful for batch-scanned documents). Save named workflows to localStorage; **Load** replaces current steps, **+ Append** joins a saved workflow onto the end of the current one — enabling complex pipelines composed from saved building blocks. Export / import workflows as JSON. Runs the full sequence on one or more uploaded PDFs. |
 
 ---
 
@@ -176,7 +176,7 @@ All facts in this section are derived from `api.php`, `_tool_head.php`, and per-
 
 Facts are derived from code (`api.php` constants, engine list, scan.php source). Competitor claims are based on their published documentation and terms of service as of early 2026.
 
-| Feature | PQ Crypta PDF Tools | Adobe Acrobat Online | SmallPDF | iLovePDF | PDF24 | Sejda |
+| Feature | PQ PDF PDF Tools | Adobe Acrobat Online | SmallPDF | iLovePDF | PDF24 | Sejda |
 |---|---|---|---|---|---|---|
 | File retention after processing | **Deleted during download** (cleanup in send_file()) | Up to 1 hour (published policy) | Up to 1 hour | Up to 2 hours | Up to 1 hour | Up to 1 hour |
 | Account required | **No** | Yes (for most features) | No (limited) | No (limited) | No | No |
@@ -196,7 +196,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 
 ## PDF Threat Scanner — 20 Detection Engines
 
-[/pdf/tools/scan.php](https://pqcrypta.com/pdf/tools/scan.php)
+[/pdf/tools/scan.php](https://pqpdf.com/pdf/tools/scan.php)
 
 15 static analysis engines, one dynamic behavioral sandbox, an ML Intelligence Engine, a differential parsing engine, a polyglot/embedded binary detector, and a JavaScript AST deobfuscation engine — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing, and every scan is persisted to PostgreSQL to continuously improve the ML models. All 20 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
 
@@ -655,7 +655,7 @@ After a scan, two sanitize methods are available using the session token — the
 
 ## Edit PDF — 15 Annotation Tools
 
-[/pdf/tools/edit.php](https://pqcrypta.com/pdf/tools/edit.php)
+[/pdf/tools/edit.php](https://pqpdf.com/pdf/tools/edit.php)
 
 The editor renders each page to a canvas and applies all changes server-side via PyMuPDF.
 
@@ -726,7 +726,7 @@ Pages are displayed as draggable thumbnails in the left sidebar:
 
 ## Protect PDF — Dual Encryption Modes
 
-[/pdf/tools/protect.php](https://pqcrypta.com/pdf/tools/protect.php)
+[/pdf/tools/protect.php](https://pqpdf.com/pdf/tools/protect.php)
 
 ### Standard Mode (AES-256-CBC, server-side)
 
@@ -759,7 +759,7 @@ Pages are displayed as draggable thumbnails in the left sidebar:
 
 ## Sign PDF — Three Input Methods
 
-[/pdf/tools/sign.php](https://pqcrypta.com/pdf/tools/sign.php)
+[/pdf/tools/sign.php](https://pqpdf.com/pdf/tools/sign.php)
 
 | Method | Description |
 |---|---|
@@ -777,7 +777,7 @@ Pages are displayed as draggable thumbnails in the left sidebar:
 
 ## Flatten PDF — Content Scan
 
-[/pdf/tools/flatten.php](https://pqcrypta.com/pdf/tools/flatten.php)
+[/pdf/tools/flatten.php](https://pqpdf.com/pdf/tools/flatten.php)
 
 On upload, PDF.js scans the document client-side before submission:
 
@@ -795,7 +795,7 @@ If no interactive elements are found, a green **Already flat** badge is shown. I
 
 ## Repair PDF — Corruption Diagnostics
 
-[/pdf/tools/repair.php](https://pqcrypta.com/pdf/tools/repair.php)
+[/pdf/tools/repair.php](https://pqpdf.com/pdf/tools/repair.php)
 
 On upload, PDF.js performs a client-side diagnostic pass before the file is sent to the server:
 
@@ -814,7 +814,7 @@ The Repair tool will attempt server-side recovery regardless of the scan result.
 
 ## Unlock PDF — Encryption Detection
 
-[/pdf/tools/unlock.php](https://pqcrypta.com/pdf/tools/unlock.php)
+[/pdf/tools/unlock.php](https://pqpdf.com/pdf/tools/unlock.php)
 
 When a `.pdf` file is selected, the first 4 KB is read client-side and checked for the `/Encrypt` dictionary marker:
 
@@ -829,7 +829,7 @@ PQC bundles (`.pqcpdf`) are auto-detected by file extension and routed directly 
 
 ## PDF → Images — Live DPI Preview
 
-[/pdf/tools/to-images.php](https://pqcrypta.com/pdf/tools/to-images.php)
+[/pdf/tools/to-images.php](https://pqpdf.com/pdf/tools/to-images.php)
 
 After upload, page 1 is rendered via PDF.js at the currently selected DPI. A preview canvas appears between the DPI selector and the pages options, showing the actual output resolution before any server processing:
 
@@ -842,7 +842,7 @@ After upload, page 1 is rendered via PDF.js at the currently selected DPI. A pre
 
 ## Split PDF — Four Split Modes
 
-[/pdf/tools/split.php](https://pqcrypta.com/pdf/tools/split.php)
+[/pdf/tools/split.php](https://pqpdf.com/pdf/tools/split.php)
 
 | Mode | Parameter | Description |
 |---|---|---|
@@ -855,7 +855,7 @@ After upload, page 1 is rendered via PDF.js at the currently selected DPI. A pre
 
 ## Watermark — Position Options
 
-[/pdf/tools/watermark.php](https://pqcrypta.com/pdf/tools/watermark.php)
+[/pdf/tools/watermark.php](https://pqpdf.com/pdf/tools/watermark.php)
 
 `position`: `diagonal` | `center` | `top-left` | `top-right` | `bottom-left` | `bottom-right`
 
@@ -867,7 +867,7 @@ Additional parameter: `font_style`
 
 ## Redact PDF — Two Modes
 
-[/pdf/tools/redact.php](https://pqcrypta.com/pdf/tools/redact.php)
+[/pdf/tools/redact.php](https://pqpdf.com/pdf/tools/redact.php)
 
 **Text pattern mode:**
 - Add multiple patterns to a list; each can be removed individually
@@ -882,7 +882,7 @@ Additional parameter: `font_style`
 
 ## OCR PDF — Tesseract 5 LSTM
 
-[/pdf/tools/ocr.php](https://pqcrypta.com/pdf/tools/ocr.php)
+[/pdf/tools/ocr.php](https://pqpdf.com/pdf/tools/ocr.php)
 
 Converts scanned and image-based PDFs to machine-readable text using Tesseract 5's LSTM neural network engine.
 
@@ -938,7 +938,7 @@ A 20-page document at 200 DPI takes approximately 100 seconds. The UI shows a li
 
 ## Rotate PDF — Page Selection
 
-[/pdf/tools/rotate.php](https://pqcrypta.com/pdf/tools/rotate.php)
+[/pdf/tools/rotate.php](https://pqpdf.com/pdf/tools/rotate.php)
 
 `pages`: `all` | `odd` | `even` | `range` (+ `page_range`)
 
@@ -1063,6 +1063,17 @@ pdf/
 
 ---
 
+## Site Pages
+
+| Page | URL | Description |
+|---|---|---|
+| **Home / PDF Tools** | [pqpdf.com](https://pqpdf.com) | Tool hub — all 31 PDF tools |
+| **Contact** | [pqpdf.com/contact](https://pqpdf.com/contact/) | Contact form with AI behavioural human verification |
+| **Legal Notice** | [pqpdf.com/legal/legal.php](https://pqpdf.com/legal/legal.php) | Terms of use, file handling guarantee, IP rights |
+| **Privacy Policy** | [pqpdf.com/legal/privacy.php](https://pqpdf.com/legal/privacy.php) | Data handling, GDPR rights, zero-retention confirmation |
+
+---
+
 ## License
 
-Copyright © PQ Crypta. All rights reserved.
+Copyright © PQ PDF. All rights reserved.
