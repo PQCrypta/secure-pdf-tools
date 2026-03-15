@@ -9,6 +9,26 @@ Every operation runs entirely on the server. Files are processed and immediately
 
 ---
 
+## Why This Exists
+
+Most online PDF tools share a structural problem: they are built around cloud storage. A file uploaded to process a watermark travels to a third-party processing service, sits in object storage for minutes to hours, passes through analytics pipelines, and is subject to retention policies that are either vague or opaque. Free tiers are underwritten by data — user files, metadata, behavioural signals — sold or used to train models.
+
+Four specific gaps drove this project:
+
+**1. No zero-retention guarantee anywhere in the stack**
+Existing tools retain files for cleanup windows (1 hour, 2 hours, "as soon as possible"). The server-side `send_file()` function in this project calls `cleanup()` immediately after `readfile()` — the temp directory is deleted while the download is still in flight. There is no retention window because there is no buffer.
+
+**2. No multi-engine threat analysis for PDFs**
+PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 20 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine (IsolationForest + RandomForest on a 38-feature vector), a differential parsing engine comparing three independent parsers, a polyglot binary detector, and a JavaScript AST deobfuscator.
+
+**3. No post-quantum cryptography in document workflows**
+All existing tools use AES-256 at best. This project integrates 31 post-quantum algorithms (NIST-standardised ML-KEM-1024, HQC-128/192/256, FN-DSA variants, and hybrid modes) for PDF encryption, running client-side in the browser before any data is transmitted.
+
+**4. No transparency about what engines are actually running**
+Proprietary SaaS tools describe their operations in marketing language. This project runs on openly documented, auditable open-source engines: Ghostscript, Poppler, LibreOffice, Tesseract 5, PyMuPDF, ImageMagick, qpdf, ExifTool, YARA, ClamAV, PeePDF, and Acorn. Every operation in every tool is described in the exact pipeline terms of the actual code.
+
+---
+
 ## Tools (31)
 
 ### Core Manipulation
@@ -66,6 +86,111 @@ Every operation runs entirely on the server. Files are processed and immediately
 | Tool | Link | Description |
 |---|---|---|
 | **Workflow Builder** | [/pdf/tools/workflow.php](https://pqcrypta.com/pdf/tools/workflow.php) | Chain operations visually: add steps from the picker, configure per-step parameters, drag to reorder. Supported steps: rotate, compress, watermark, protect, unlock, grayscale, flatten, repair, extract pages, delete pages, reorder pages, convert to PDF/A, **sign** (typed visual / typed visual + digital / digital-only with auto self-signed cert), **redact** (permanent text-pattern removal, case-sensitive option, black or white fill), and **split every N pages** (terminal step — outputs a ZIP of equal-sized PDF chunks, useful for batch-scanned documents). Save named workflows to localStorage; **Load** replaces current steps, **+ Append** joins a saved workflow onto the end of the current one — enabling complex pipelines composed from saved building blocks. Export / import workflows as JSON. Runs the full sequence on one or more uploaded PDFs. |
+
+---
+
+## Architecture
+
+```
+Browser (HTTPS / HTTP2)
+        │
+        ▼
+┌──────────────────────────────────────────────────────────┐
+│  Apache HTTP/2  ·  PHP 8.4 FPM                           │
+│                                                          │
+│  ┌─────────────┐     ┌──────────────────────────────┐   │
+│  │  Tool page  │────▶│  api.php  (single endpoint)  │   │
+│  │  (PHP+JS)   │◀────│  POST multipart/form-data    │   │
+│  └─────────────┘     └──────────┬───────────────────┘   │
+│                                 │                        │
+│                    create_temp_dir()                      │
+│                    pdftool_{24-hex-chars}  (mode 0700)   │
+│                                 │                        │
+│                    ┌────────────▼────────────────────┐   │
+│                    │  Processing engines (per op)    │   │
+│                    │                                 │   │
+│                    │  Ghostscript  — compress, water-│   │
+│                    │    mark, rotate, protect, unlock│   │
+│                    │    flatten, grayscale, repair   │   │
+│                    │  Poppler (pdfunite/pdftoppm/    │   │
+│                    │    pdftotext/pdfinfo) — merge,  │   │
+│                    │    split, extract-text,         │   │
+│                    │    to-images, get-info          │   │
+│                    │  qpdf         — protect/unlock  │   │
+│                    │  LibreOffice  — Office↔PDF      │   │
+│                    │  ImageMagick  — image→PDF       │   │
+│                    │  Tesseract 5  — OCR (LSTM)      │   │
+│                    │  PyMuPDF/Python — scan engines  │   │
+│                    │  ExifTool, YARA, ClamAV         │   │
+│                    │  PeePDF, strace/unshare, acorn  │   │
+│                    │  scikit-learn (IsolationForest  │   │
+│                    │    + RandomForest) — ML (⑰)     │   │
+│                    └────────────┬────────────────────┘   │
+│                                 │                        │
+│                    send_file()  ─  readfile() then       │
+│                    cleanup()   ─  rm -rf temp dir        │
+│                                 │                        │
+└─────────────────────────────────┼────────────────────────┘
+                                  ▼
+                        Download stream → Browser
+                        (temp dir already deleted)
+```
+
+Every operation creates one isolated temp directory, runs entirely inside it, streams the result to the browser, and deletes the directory. No file ever touches persistent storage.
+
+---
+
+## Security Model
+
+All facts in this section are derived from `api.php`, `_tool_head.php`, and per-tool PHP pages.
+
+### File Validation
+- Magic-byte check before any processing: `fread($fh, 4) === '%PDF'` — Office/image uploads skip this check, PDF operations require it.
+- File size limits enforced at upload: **50 MB per file** (`MAX_FILE_SIZE = 52_428_800`), **200 MB total** across all files in a single request (`MAX_TOTAL_SIZE = 209_715_200`).
+- MIME type checked against `['application/pdf', 'application/x-pdf']` for PDF operations.
+
+### Temporary Workspace Isolation
+- Each request creates `sys_get_temp_dir() . '/pdftool_' . bin2hex(random_bytes(12))` — a 24-character cryptographically random hex suffix, directory mode `0700`.
+- Shell commands receive paths via `escapeshellarg()` — no user-controlled string ever reaches the shell unescaped.
+- `timeout CMD_TIMEOUT` (120 seconds) wraps every external command — no process runs indefinitely.
+
+### Zero Retention
+- `send_file()` calls `readfile($path)` then immediately calls `cleanup($cleanup_paths)` and `exit`.
+- The temp directory is deleted **while the download is still streaming** to the browser.
+- No file content is written to any database. No file path is logged.
+
+### Rate Limiting
+- Session-based sliding-window counter: **10 operations per 5-minute window** (`RATE_LIMIT_MAX = 10`, `RATE_LIMIT_WINDOW = 300`).
+- Poll/keepalive operations (`edit-page`, `edit-ping`, `pdf-scan-poll`) are explicitly exempt to avoid blocking live progress UIs.
+- Limit exceeded returns HTTP 429 with a plain-text message — no silent fail.
+
+### Content Security Policy
+- Every tool page sets a strict CSP with per-request nonces: `script-src 'nonce-{ext}' 'nonce-{inline}'`.
+- `style-src 'self'` — no inline styles anywhere in the HTML.
+- No `unsafe-inline`, no `unsafe-eval`, no blob worker URLs.
+- All event handlers are registered with `addEventListener()` in external JS modules; no `onclick` or `onload` attributes exist in any HTML.
+
+---
+
+## Comparison
+
+Facts are derived from code (`api.php` constants, engine list, scan.php source). Competitor claims are based on their published documentation and terms of service as of early 2026.
+
+| Feature | PQ Crypta PDF Tools | Adobe Acrobat Online | SmallPDF | iLovePDF | PDF24 | Sejda |
+|---|---|---|---|---|---|---|
+| File retention after processing | **Deleted during download** (cleanup in send_file()) | Up to 1 hour (published policy) | Up to 1 hour | Up to 2 hours | Up to 1 hour | Up to 1 hour |
+| Account required | **No** | Yes (for most features) | No (limited) | No (limited) | No | No |
+| Threat scanning engines | **20 independent engines** incl. ML + sandbox | None | None | None | None | None |
+| ML-based anomaly detection | **Yes** (IsolationForest + RandomForest, 38-feature vector, continuously retrained) | No | No | No | No | No |
+| Dynamic behavioral sandbox | **Yes** (strace + Linux namespaces, full syscall trace) | No | No | No | No | No |
+| Post-quantum encryption | **Yes** (31 algorithms via @noble/post-quantum, client-side) | No | No | No | No | No |
+| OCR engine | **Tesseract 5 LSTM** (confidence scoring, searchable PDF output, TSV word-level stats) | Adobe Sensei | Acrobat engine | Tesseract | Tesseract | Tesseract |
+| PDF edit tools | **15 annotation types** incl. QR code generator | Many | Limited | Limited | Limited | Limited |
+| Transparency (engine names) | **Ghostscript, Poppler, LibreOffice, Tesseract, PyMuPDF, ExifTool, YARA, ClamAV, PeePDF, strace, acorn, scikit-learn** | Undisclosed | Undisclosed | Undisclosed | Undisclosed | Undisclosed |
+| Open-source engines only | **Yes** — every engine is named open-source software | No | No | No | No | No |
+| Max upload (free) | **50 MB / file, 200 MB total** | 100 MB (Adobe account) | 5 GB (with account) | 200 MB | 200 MB | 200 MB |
+| JavaScript AST deobfuscation | **Yes** (Engine ⑳, acorn parser) | No | No | No | No | No |
+| Differential parsing (3 parsers) | **Yes** (Engine ⑱) | No | No | No | No | No |
 
 ---
 
@@ -755,6 +880,60 @@ Additional parameter: `font_style`
 
 ---
 
+## OCR PDF — Tesseract 5 LSTM
+
+[/pdf/tools/ocr.php](https://pqcrypta.com/pdf/tools/ocr.php)
+
+Converts scanned and image-based PDFs to machine-readable text using Tesseract 5's LSTM neural network engine.
+
+### How It Works
+
+1. **Page rasterisation** — `pdftoppm` converts each PDF page to a PPM image at the selected DPI. Pages are processed one at a time to prevent disk exhaustion on large files; the PPM for a given page is deleted before the next page starts.
+2. **LSTM OCR** — `tesseract` processes the PPM with the `eng` LSTM model. The PSM (page segmentation mode) is passed as `--psm {psm}`. Output format flags (`txt`, `pdf`, `tsv`, or all three) are passed in a single invocation per page — no page is OCR'd twice.
+3. **Confidence scoring** — Tesseract's TSV output (column 10) contains per-word confidence values (0–100) and structural-element markers (−1). The handler filters out −1 values and averages the remaining scores across all pages to produce an overall confidence percentage.
+4. **Searchable PDF assembly** — When format includes `pdf`, tesseract produces one PDF per page (original image + invisible text overlay). If the job covers more than one page, `pdfunite` concatenates the per-page PDFs into a single searchable document. Single-page jobs skip `pdfunite` and use a direct `rename()`.
+5. **Output packaging** — `txt` output is sent as a `.txt` file; `pdf` output as a `.pdf`; `both` output as a `.zip` containing both files.
+6. **Stats header** — The API sets `X-OCR-Stats` (JSON: `pages_processed`, `total_pages`, `word_count`, `char_count`, `avg_confidence`, `dpi`, `format`) and `Access-Control-Expose-Headers: X-OCR-Stats` so the browser JS can read it from the XHR response without inspecting the body.
+
+### Options
+
+| Option | Values | Default |
+|---|---|---|
+| DPI | 150 / 200 / 300 | 200 |
+| PSM | 3 (auto), 4 (single column), 6 (single block), 11 (sparse text) | 3 |
+| Output format | txt / pdf / both (ZIP) | txt |
+| Pages | all / custom range | all |
+| Max pages | 100 (hard cap) | — |
+
+### Performance
+
+Derived from the time estimate logic in `ocr.js` (`timeEstimate` function):
+
+| DPI | Approximate time per page |
+|---|---|
+| 150 | ~3 seconds |
+| 200 | ~5 seconds |
+| 300 | ~8 seconds |
+
+A 20-page document at 200 DPI takes approximately 100 seconds. The UI shows a live time estimate badge for documents over 15 pages and cycles through 8 OCR-phase status messages while the server processes.
+
+### Accuracy Notes
+
+- Best results on clean, high-contrast scans (printed text, typed forms).
+- **300 DPI recommended** for small fonts or handwriting — higher resolution gives the LSTM model more detail.
+- **PSM 11 (sparse text)** works best for documents with isolated text blocks: forms, receipts, labels.
+- **PSM 4 (single column)** suits newspaper-style layouts.
+- The client-side JS analyses the PDF with PDF.js before upload and warns if a text layer already exists (OCR is unnecessary for native-digital PDFs).
+- Only the `eng` language model is installed (`/usr/share/tesseract-ocr/5/tessdata/eng.traineddata`). Multi-language documents produce lower confidence scores.
+
+### Privacy
+
+- The PPM image for each page is deleted immediately after that page is OCR'd — only one page image exists on disk at any time.
+- No text content, file content, or OCR output is written to any database or log.
+- The temp directory (`pdftool_{24-hex}`) is deleted by `send_file()` → `cleanup()` while the download is streaming.
+
+---
+
 ## Rotate PDF — Page Selection
 
 [/pdf/tools/rotate.php](https://pqcrypta.com/pdf/tools/rotate.php)
@@ -787,7 +966,7 @@ Additional parameter: `font_style`
 ```
 pdf/
 ├── index.php                  # Hub — tool cards, search, drag-drop, IndexedDB file transfer
-├── api.php                    # Single POST endpoint — all 40 operations
+├── api.php                    # Single POST endpoint — all 41 operations
 ├── README.md                  # This file
 ├── css/
 │   ├── pdf.css                # Complete UI styles
@@ -831,6 +1010,7 @@ pdf/
 │       ├── redact.js          # Text patterns + region drawing mode
 │       ├── compare.js         # Side-by-side page 1 canvas previews, DPI + sensitivity controls
 │       ├── edit.js            # 15-tool canvas editor, eraser, duplicate page, first/last nav, right-click thumbnail context menu, session timer
+│       ├── ocr.js             # Tesseract 5 OCR — PDF.js text-layer detection, DPI time-estimate badge, server progress cycling (8 phase messages), confidence bar + 5-stat tiles, text preview tabs
 │       └── workflow.js        # Visual step builder, drag reorder; 15 step types incl. sign (3 modes), redact, split-every-N (ZIP output)
 ├── scripts/                   # Python helpers (server-side operations)
 │   ├── pdf_to_excel.py        # Table extraction helper (PyMuPDF + openpyxl)
@@ -875,6 +1055,7 @@ pdf/
     ├── redact.php
     ├── compare.php
     ├── edit.php
+    ├── ocr.php
     └── workflow.php
 ```
 
