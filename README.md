@@ -29,7 +29,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 
 ---
 
-## Tools (33)
+## Tools (32)
 
 ### Core Manipulation
 
@@ -75,7 +75,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 |---|---|---|
 | **Add Watermark** | [/tools/watermark.php](https://pqpdf.com/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
 | **Sign PDF** | [/tools/sign.php](https://pqpdf.com/tools/sign.php) | Three signature input methods: draw (canvas with touch support), type (text-rendered), or upload an image. Place on first/last/custom page with x/y/size controls. Live placement preview: after drawing, typing, or uploading a signature, it is composited directly onto a rendered page 1 canvas at the chosen position and size — updates in real time as you move the position selectors or drag the size slider. Optional cryptographic metadata. |
-| **Edit PDF** | [/tools/edit.php](https://pqpdf.com/tools/edit.php) | Full page-by-page visual editor with 15 annotation tools plus an interactive form builder. Draws AcroForm widgets (Text, CheckBox, RadioButton, ListBox, ComboBox, Signature, PushButton) directly onto the PDF canvas, then commits them server-side via PyMuPDF. See full details below. |
+| **Edit PDF** | [/tools/edit.php](https://pqpdf.com/tools/edit.php) | Full page-by-page visual editor with 16 annotation tools, an interactive form builder, and a bookmark editor. Annotation tools include sticky notes (PDF text annotations with popups) and a bookmark panel for building a navigable table of contents. Draws AcroForm widgets (Text, CheckBox, RadioButton, ListBox, ComboBox, Signature, PushButton) directly onto the PDF canvas, then commits everything server-side via PyMuPDF. See full details below. |
 | **Fill PDF Form** | [/tools/fill.php](https://pqpdf.com/tools/fill.php) | Detect and fill all interactive AcroForm fields in any PDF — text inputs, checkboxes, radio buttons, drop-down menus, and list boxes. Values are written server-side via PyMuPDF. Optional flatten-after-filling bakes field values into static page content for archiving or sharing. |
 | **Compare PDFs** | [/tools/compare.php](https://pqpdf.com/tools/compare.php) | Visual diff of two PDFs. Configure DPI (72/96/150/300) and sensitivity. Side-by-side page 1 canvas previews render immediately when each file is selected. Outputs a highlighted diff PDF with change regions marked. |
 | **Extract Text** | [/tools/extract-text.php](https://pqpdf.com/tools/extract-text.php) | Export all text to `.txt`. Options: layout preservation, text encoding, custom page range. |
@@ -186,7 +186,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 | Dynamic behavioral sandbox | **Yes** (strace + Linux namespaces, full syscall trace) | No | No | No | No | No |
 | Post-quantum encryption | **Yes** (31 algorithms via @noble/post-quantum, client-side) | No | No | No | No | No |
 | OCR engine | **Tesseract 5 LSTM** (confidence scoring, searchable PDF output, TSV word-level stats) | Adobe Sensei | Acrobat engine | Tesseract | Tesseract | Tesseract |
-| PDF edit tools | **15 annotation types** incl. QR code generator | Many | Limited | Limited | Limited | Limited |
+| PDF edit tools | **16 annotation types** incl. sticky notes, QR code, stamps + bookmark editor | Many | Limited | Limited | Limited | Limited |
 | Transparency (engine names) | **Ghostscript, Poppler, LibreOffice, Tesseract, PyMuPDF, ExifTool, YARA, ClamAV, PeePDF, strace, acorn, scikit-learn** | Undisclosed | Undisclosed | Undisclosed | Undisclosed | Undisclosed |
 | Open-source engines only | **Yes** — every engine is named open-source software | No | No | No | No | No |
 | Max upload (free) | **50 MB / file, 200 MB total** | 100 MB (Adobe account) | 5 GB (with account) | 200 MB | 200 MB | 200 MB |
@@ -662,7 +662,7 @@ After a scan, two sanitize methods are available using the session token — the
 
 ---
 
-## Edit PDF — 15 Annotation Tools + Form Builder
+## Edit PDF — 16 Annotation Tools + Form Builder + Bookmark Editor
 
 [/tools/edit.php](https://pqpdf.com/tools/edit.php)
 
@@ -685,6 +685,7 @@ The editor renders each page to a canvas and applies all changes server-side via
 | **Signature** | Open a signature canvas modal (draw with mouse or touch), place result on page. |
 | **QR Code** | Generate a QR code from any URL or text string (via `edit-qr-generate` API), set size, and place on page. |
 | **Stamp** | Insert one of 12 built-in stamps (DRAFT, APPROVED, REJECTED, CONFIDENTIAL, TOP SECRET, VOID, COPY, FINAL, REVISED, REVIEW, NOT APPROVED, PAID) or type a custom stamp text. |
+| **Sticky Note** | Click to place a sticky note annotation at any point on the page. Enter text in the modal, pick a note colour (yellow default). Rendered as a folded-corner icon on the canvas; written as a native `page.add_text_annot()` PDF text annotation with a popup comment on export — visible in Acrobat and all standards-compliant viewers. |
 | **Form Field** | Draw any interactive AcroForm widget onto the page — see Form Builder section below. |
 
 ### Form Builder
@@ -713,6 +714,7 @@ All 7 PyMuPDF / PDF specification widget types are supported:
 
 ### Additional Edit Features
 
+- **Bookmark editor** — open the Bookmarks panel to build a navigable table of contents: add bookmark entries by title and page number (defaulting to the current page), reorder by adding in sequence, delete individual entries. On Apply & Download, bookmarks are written to the PDF via `out_doc.set_toc()`, creating a native PDF outline visible in all viewers that support bookmarks (Acrobat, Chrome, Firefox, Preview, etc.)
 - **Page numbering** — auto-add page numbers with position (top/bottom/left/right), format (1 / Page 1 / 1 of 10), start number, font size, and colour
 - **Headers & footers** — insert header and footer text with alignment, font size, and colour
 - **Insert blank page** — add a blank page before or after the current page; also supports creating a new blank PDF from scratch
@@ -1077,6 +1079,7 @@ pdf/
 │       ├── redact.js          # Text patterns + region drawing mode
 │       ├── compare.js         # Side-by-side page 1 canvas previews, DPI + sensitivity controls
 │       ├── edit.js            # 15-tool canvas editor, eraser, duplicate page, first/last nav, right-click thumbnail context menu, session timer
+│       ├── fill.js            # AcroForm field detection + value entry (text, checkbox, radio, select, listbox), flatten-after-fill toggle
 │       ├── ocr.js             # Tesseract 5 OCR — PDF.js text-layer detection, DPI time-estimate badge, server progress cycling (8 phase messages), confidence bar + 5-stat tiles, text preview tabs
 │       └── workflow.js        # Visual step builder, drag reorder; 15 step types incl. sign (3 modes), redact, split-every-N (ZIP output)
 ├── scripts/                   # Python helpers (server-side operations)
@@ -1122,6 +1125,7 @@ pdf/
     ├── redact.php
     ├── compare.php
     ├── edit.php
+    ├── fill.php
     ├── ocr.php
     └── workflow.php
 ```
@@ -1132,10 +1136,192 @@ pdf/
 
 | Page | URL | Description |
 |---|---|---|
-| **Home / PDF Tools** | [pqpdf.com](https://pqpdf.com) | Tool hub — all 31 PDF tools |
+| **Home / PDF Tools** | [pqpdf.com](https://pqpdf.com) | Tool hub — all 32 PDF tools |
 | **Contact** | [pqpdf.com/contact](https://pqpdf.com/contact/) | Contact form with AI behavioural human verification |
 | **Legal Notice** | [pqpdf.com/legal/legal.php](https://pqpdf.com/legal/legal.php) | Terms of use, file handling guarantee, IP rights |
 | **Privacy Policy** | [pqpdf.com/legal/privacy.php](https://pqpdf.com/legal/privacy.php) | Data handling, GDPR rights, zero-retention confirmation |
+| **Privacy & Security** | [pqpdf.com/legal/security.php](https://pqpdf.com/legal/security.php) | Technical security page: temp-dir lifecycle, TLS config, ML data policy |
+| **Sitemap** | [pqpdf.com/sitemap.php](https://pqpdf.com/sitemap.php) | Dynamic XML sitemap with `lastmod` timestamps derived from `filemtime()` |
+
+---
+
+## API Quickstart
+
+All operations share a single endpoint: `POST /api.php` with `multipart/form-data`.
+
+### Compress a PDF
+
+```bash
+curl -X POST https://pqpdf.com/api.php \
+  -F "operation=compress" \
+  -F "quality=ebook" \
+  -F "file=@input.pdf" \
+  --output compressed.pdf
+```
+
+**Quality presets:** `screen` (72 dpi) · `ebook` (150 dpi) · `printer` (300 dpi) · `prepress` (300 dpi, colour-managed)
+
+### Merge PDFs
+
+```bash
+curl -X POST https://pqpdf.com/api.php \
+  -F "operation=merge" \
+  -F "files[]=@doc1.pdf" \
+  -F "files[]=@doc2.pdf" \
+  -F "files[]=@doc3.pdf" \
+  --output merged.pdf
+```
+
+Up to 20 files, 200 MB total. Page order follows the array order of `files[]`.
+
+### OCR a scanned PDF
+
+```bash
+curl -X POST https://pqpdf.com/api.php \
+  -F "operation=ocr" \
+  -F "dpi=200" \
+  -F "format=pdf" \
+  -F "psm=3" \
+  -F "file=@scanned.pdf" \
+  --output searchable.pdf
+```
+
+**`format`:** `txt` · `pdf` (searchable PDF) · `both` (ZIP with both)
+**`psm`:** `3` auto · `4` single-column · `6` block · `11` sparse
+
+After the request completes the response header `X-OCR-Stats` carries a JSON object:
+
+```json
+{
+  "pages_processed": 12,
+  "total_pages": 12,
+  "word_count": 4821,
+  "char_count": 28934,
+  "avg_confidence": 94.3,
+  "dpi": 200,
+  "format": "pdf"
+}
+```
+
+### Run a PDF threat scan
+
+Scanning is two-step: start a scan, then poll for results.
+
+**Step 1 — start scan:**
+
+```bash
+curl -X POST https://pqpdf.com/api.php \
+  -F "operation=pdf-scan-start" \
+  -F "file=@suspect.pdf" \
+  -c cookies.txt
+```
+
+**Response:**
+```json
+{ "status": "started", "session_token": "abc123..." }
+```
+
+**Step 2 — poll for report:**
+
+```bash
+curl -X POST https://pqpdf.com/api.php \
+  -F "operation=pdf-scan-poll" \
+  -b cookies.txt
+```
+
+Returns `{ "status": "running" }` while the 20 engines execute, then the full threat report JSON once complete. Poll every 2 seconds until `status` is `done` or `error`.
+
+**Threat report envelope:**
+```json
+{
+  "status": "done",
+  "risk_score": 42,
+  "risk_level": "Suspicious",
+  "ml_score": 0.17,
+  "indicators": [
+    {
+      "engine": "Engine ②",
+      "level": "High",
+      "message": "/JavaScript action found in raw bytes",
+      "count": 1
+    }
+  ],
+  "engines_run": 20,
+  "session_token": "abc123..."
+}
+```
+
+### Common parameters
+
+| Parameter | Description | Default |
+|---|---|---|
+| `operation` | Operation name (see allowed list in `api.php`) | required |
+| `file` | Single PDF file (most operations) | required |
+| `files[]` | Multiple files (merge, compare) | required |
+| `quality` | Compress preset: `screen` / `ebook` / `printer` / `prepress` | `ebook` |
+| `dpi` | Target DPI for image output / OCR | varies |
+| `page_range` | Custom page range e.g. `1-3,5,7-9` | all pages |
+
+### Limits
+
+| Limit | Value |
+|---|---|
+| Max file size | 50 MB per file |
+| Max total upload | 200 MB per request |
+| Rate limit | 10 operations / 5 minutes (per session) |
+| Shell command timeout | 120 seconds |
+| OCR page cap | 100 pages per job |
+
+HTTP `429` is returned when the rate limit is exceeded.
+
+---
+
+## Enterprise FAQ
+
+### File size and concurrency
+
+**Q: What are the upload limits?**
+50 MB per file, 200 MB total across all files in a single request. These are hard limits enforced in `api.php` (`MAX_FILE_SIZE = 52_428_800`, `MAX_TOTAL_SIZE = 209_715_200`) before any processing begins.
+
+**Q: How many operations can I run in parallel?**
+The session-based rate limit is 10 operations per 5-minute sliding window. Polling endpoints (`pdf-scan-poll`, `edit-ping`, `edit-page`) are exempt. Concurrent sessions from different browsers / IP addresses each have their own independent counter.
+
+**Q: Is there a page count limit?**
+OCR is capped at 100 pages per job. All other operations have no hard page cap, though processing time is bounded by the 120-second per-command shell timeout.
+
+**Q: What happens to my file after I click Download?**
+The temp directory is deleted by `cleanup()` *inside* `send_file()`, which is called immediately after `readfile()` streams the file to the browser. Deletion begins while the download is still in flight — there is no retention buffer, no post-download cleanup window, and no async garbage-collection job.
+
+### Security and compliance
+
+**Q: Does PQ PDF use any third-party cloud services for processing?**
+No. Every operation — including OCR, threat scanning, format conversion, and ML inference — runs entirely on the server at pqpdf.com. No file data is forwarded to any external API, cloud storage bucket, or third-party service at any point.
+
+**Q: How is data in transit protected?**
+All connections are served over TLS 1.2/1.3 via Apache with HSTS (`max-age=31536000; includeSubDomains; preload`). HTTP connections are upgraded by the `upgrade-insecure-requests` CSP directive. Certificate pinning is not enforced at the application layer; browsers rely on standard CA chain validation.
+
+**Q: Does the PDF threat scanner send files to VirusTotal or any external scanner?**
+No. All 20 detection engines run locally: PyMuPDF, ExifTool, qpdf, YARA, PeePDF, ClamAV, the scikit-learn ML models, and the dynamic sandbox (`strace` + `unshare` Linux namespaces) all execute on the same server. No bytes leave the server during a scan.
+
+**Q: What data does the ML engine store?**
+Engine ⑰ writes a 38-feature vector (structural heuristics, entropy scores, indicator counts) derived from each scan to PostgreSQL. **No file content, file name, IP address, or user identifier is stored.** The feature vector contains only numeric measurements extracted from the PDF structure. Stored records are used exclusively to retrain the IsolationForest and RandomForest models every 30 minutes. Users can submit a feedback label (malicious / benign) via the scan report UI; this label is appended to the existing feature row, not stored separately.
+
+**Q: Is the service GDPR-compliant?**
+Files are never retained (zero-retention guarantee above). The only personal data processed is the IP address in Apache access logs, which are subject to standard server log rotation. No file content, metadata, or user-identifying information is stored in any application database. See the [Privacy Policy](https://pqpdf.com/legal/privacy.php) for full GDPR rights.
+
+**Q: What compliance frameworks are relevant?**
+The zero-retention architecture (no file persistence, no cloud forwarding, ephemeral temp dirs) is designed to be compatible with workflows governed by GDPR, HIPAA (no PHI storage), and internal data-handling policies that prohibit uploading documents to third-party SaaS. PQ PDF does not hold any formal certifications (SOC 2, ISO 27001) at this time.
+
+### SLAs and support
+
+**Q: What uptime SLA is offered?**
+PQ PDF is a free public service with no formal SLA. There is no guaranteed uptime, no support tier, and no compensated downtime.
+
+**Q: How do I report a security vulnerability?**
+Email **security@pqpdf.com** with a description of the issue. We aim to acknowledge reports within 48 hours and publish fixes without unnecessary delay. Please allow reasonable time for remediation before public disclosure.
+
+**Q: How do I request a security review or integration discussion for enterprise use?**
+Use the [contact form](https://pqpdf.com/contact/) or email **contact@pqpdf.com** with the subject line `Enterprise / Security Review`. Include your organisation name, use-case description, and any specific compliance requirements.
 
 ---
 
