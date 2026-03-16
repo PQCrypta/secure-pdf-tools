@@ -19,7 +19,7 @@ Four specific gaps drove this project:
 Existing tools retain files for cleanup windows (1 hour, 2 hours, "as soon as possible"). The server-side `send_file()` function in this project calls `cleanup()` immediately after `readfile()` — the temp directory is deleted while the download is still in flight. There is no retention window because there is no buffer.
 
 **2. No multi-engine threat analysis for PDFs**
-PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 20 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine (IsolationForest + RandomForest on a 38-feature vector), a differential parsing engine comparing three independent parsers, a polyglot binary detector, and a JavaScript AST deobfuscator.
+PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 20 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine (IsolationForest + RandomForest on a 38-feature vector), a differential parsing engine comparing five independent parsers across 8 structural dimensions, a polyglot binary detector, and a JavaScript AST deobfuscator.
 
 **3. No post-quantum cryptography in document workflows**
 All existing tools use AES-256 at best. This project integrates 31 post-quantum algorithms (NIST-standardised ML-KEM-1024, HQC-128/192/256, FN-DSA variants, and hybrid modes) for PDF encryption, running client-side in the browser before any data is transmitted.
@@ -29,7 +29,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 
 ---
 
-## Tools (31)
+## Tools (33)
 
 ### Core Manipulation
 
@@ -64,7 +64,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Threat Scanner** | [/tools/scan.php](https://pqpdf.com/tools/scan.php) | Static, dynamic, and ML analysis across 20 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, ClamAV signature scanning (700k+ signatures), ML Intelligence Engine (IsolationForest + RandomForest + Bayesian contextual scoring), differential parser comparison (PyMuPDF vs pdfminer vs qpdf), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, OLE and more), and JavaScript AST deobfuscation (acorn). Returns a scored threat report with per-indicator context and sanitize options. |
+| **PDF Threat Scanner** | [/tools/scan.php](https://pqpdf.com/tools/scan.php) | Static, dynamic, and ML analysis across 20 detection engines: structure validation, 45+ byte-level patterns, stream entropy analysis, object graph analysis, URL extraction, metadata forensics, font anomaly detection, CVE pattern matching, ExifTool EXIF/XMP analysis, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioral sandbox (strace + isolated Linux namespaces), correlation analysis, ClamAV signature scanning (700k+ signatures), ML Intelligence Engine (IsolationForest + RandomForest + Bayesian contextual scoring), differential parser comparison (MuPDF · Poppler · Ghostscript · qpdf · pdfminer, 8 dimensions), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, OLE and more), and JavaScript AST deobfuscation (acorn). Returns a scored threat report with per-indicator context and sanitize options. |
 | **Protect PDF** | [/tools/protect.php](https://pqpdf.com/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/tools/unlock.php](https://pqpdf.com/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/tools/redact.php](https://pqpdf.com/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
@@ -75,7 +75,8 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 |---|---|---|
 | **Add Watermark** | [/tools/watermark.php](https://pqpdf.com/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
 | **Sign PDF** | [/tools/sign.php](https://pqpdf.com/tools/sign.php) | Three signature input methods: draw (canvas with touch support), type (text-rendered), or upload an image. Place on first/last/custom page with x/y/size controls. Live placement preview: after drawing, typing, or uploading a signature, it is composited directly onto a rendered page 1 canvas at the chosen position and size — updates in real time as you move the position selectors or drag the size slider. Optional cryptographic metadata. |
-| **Edit PDF** | [/tools/edit.php](https://pqpdf.com/tools/edit.php) | Full page-by-page visual editor with 15 annotation tools (see below). |
+| **Edit PDF** | [/tools/edit.php](https://pqpdf.com/tools/edit.php) | Full page-by-page visual editor with 15 annotation tools plus an interactive form builder. Draws AcroForm widgets (Text, CheckBox, RadioButton, ListBox, ComboBox, Signature, PushButton) directly onto the PDF canvas, then commits them server-side via PyMuPDF. See full details below. |
+| **Fill PDF Form** | [/tools/fill.php](https://pqpdf.com/tools/fill.php) | Detect and fill all interactive AcroForm fields in any PDF — text inputs, checkboxes, radio buttons, drop-down menus, and list boxes. Values are written server-side via PyMuPDF. Optional flatten-after-filling bakes field values into static page content for archiving or sharing. |
 | **Compare PDFs** | [/tools/compare.php](https://pqpdf.com/tools/compare.php) | Visual diff of two PDFs. Configure DPI (72/96/150/300) and sensitivity. Side-by-side page 1 canvas previews render immediately when each file is selected. Outputs a highlighted diff PDF with change regions marked. |
 | **Extract Text** | [/tools/extract-text.php](https://pqpdf.com/tools/extract-text.php) | Export all text to `.txt`. Options: layout preservation, text encoding, custom page range. |
 | **PDF Info** | [/tools/pdf-info.php](https://pqpdf.com/tools/pdf-info.php) | Display full metadata: title, author, subject, keywords, creator, producer, page count, dimensions, PDF version, encryption status, form type, tagged flag, page rotation, fast web view optimisation, creation and modification dates, permission flags. Shows a quick canvas preview of page 1 alongside the metadata. |
@@ -190,7 +191,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 | Open-source engines only | **Yes** — every engine is named open-source software | No | No | No | No | No |
 | Max upload (free) | **50 MB / file, 200 MB total** | 100 MB (Adobe account) | 5 GB (with account) | 200 MB | 200 MB | 200 MB |
 | JavaScript AST deobfuscation | **Yes** (Engine ⑳, acorn parser) | No | No | No | No | No |
-| Differential parsing (3 parsers) | **Yes** (Engine ⑱) | No | No | No | No | No |
+| Differential parsing (5 parsers, 8 dimensions) | **Yes** (Engine ⑱) | No | No | No | No | No |
 
 ---
 
@@ -207,7 +208,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 3. Engine ⑭ renders the PDF through Ghostscript, MuPDF, and Poppler inside isolated Linux namespaces (`unshare --net --pid --mount`) with all syscalls captured by `strace`. Detects runtime behavior invisible to static analysis.
 4. Engine ⑯ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
 5. Engine ⑰ extracts a 38-feature vector from all preceding engine outputs, applies Bayesian contextual scoring, runs IsolationForest anomaly detection (unsupervised — works from scan 1), and RandomForest classification (activates at ≥50 labeled samples). Reports per-scan feature importance (Explainable ML). Scan features, scores, and auto-inferred labels are persisted to PostgreSQL. Training runs every 30 minutes via cron.
-6. Engine ⑱ re-runs MuPDF (`mutool`), Poppler (`pdfinfo`/`pdfdetach`), and Ghostscript independently and compares page counts, object counts, JavaScript presence, and embedded file counts. Parser disagreement signals hidden objects, shadow object trees, or deliberate parser-confusion exploits.
+6. Engine ⑱ runs MuPDF (`mutool`), Poppler (`pdfinfo`/`pdfdetach`), Ghostscript, qpdf, and pdfminer independently and cross-compares 8 dimensions: page count, object count, JavaScript presence, PDF version, encryption status, AcroForm presence, embedded file count, and OpenAction. Seven distinct discrepancy checks (Critical/High/Medium) flag hidden objects, shadow object trees, or deliberate parser-confusion exploits. A hard 30-second SIGALRM wraps the engine; pdfminer runs in a subprocess with `timeout 6` for guaranteed hard-kill.
 7. Engine ⑲ scans every stream (raw and decompressed) for file magic byte signatures — ZIP, Windows PE, Linux ELF, Mach-O, Java class, OLE/CFBF, RAR, 7-Zip, embedded PostScript — to detect polyglot files that embed executable droppers inside a valid PDF container.
 8. Engine ⑳ extracts JavaScript from `/JS` literals and keyword-bearing compressed streams, parses each through the Acorn AST parser, and walks the AST detecting obfuscation constructs invisible to text-pattern matching: `eval()` chains, `String.fromCharCode()` arrays (shellcode staging), `unescape()` decode pipelines, large numeric arrays (heap spray), and `new Function()` dynamic construction.
 9. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score and ML malicious-probability score.
@@ -575,21 +576,29 @@ The Summary tab shows a lime ML panel: malicious probability bar (0–100%), mod
 
 ### Engine ⑱ — Differential Parsing Detection
 
-Runs three independent PDF parsers against the same file and compares their structural interpretation:
+Runs **five** independent PDF parsers against the same file and compares their structural interpretation across **8 dimensions**. A hard 30-second SIGALRM wraps the entire engine; pdfminer runs as a subprocess for guaranteed hard-kill on timeout; qpdf uses targeted fast commands only (not `--json`).
 
-| Parser | Tool | Data extracted |
+| Parser | Tools used | Data extracted |
 |---|---|---|
-| MuPDF | `mutool show xref` / `mutool info` | Object count (from xref slot count), page count, JavaScript in trailer |
-| Poppler | `pdfinfo` / `pdfdetach -list` | Page count, JavaScript yes/no, embedded file count, encryption status |
-| Ghostscript | `gs -sDEVICE=ps2write -sOutputFile=-` | Page count (from `%%Page:` markers), JavaScript in output |
+| MuPDF | `mutool show xref` · `mutool info` · `mutool show trailer` | Object count, page count, PDF version, JavaScript, AcroForm, OpenAction, Encrypt flag |
+| Poppler | `pdfinfo` · `pdfdetach -list` | Page count, PDF version, JavaScript, encryption status, form type (AcroForm/XFA/none), linearized, embedded file count, suspects flag |
+| Ghostscript | `gs -sDEVICE=nullpage` | Page count (from `Page N` stdout markers), JavaScript, OpenAction, LaunchAction in stderr/stdout |
+| qpdf | `--show-npages` · `--show-encryption` · `--check` | Page count, encryption status, linearized, structural integrity |
+| pdfminer | `python3 -c "..."` subprocess (6 s `timeout` hard-kill) | Page count, encryption (is_extractable), OpenAction, AcroForm, JavaScript in Names tree |
 
-**Flags raised:**
+**Discrepancy checks and scores:**
 
-- **Page count disagreement** (any difference) → High + 35 pts — indicates hidden incremental update, shadow object tree, or parser-confusion exploit
-- **JavaScript visibility discrepancy** (JS visible to some parsers, not others) → Critical + 50 pts — hidden JS behind parser-specific quirks (duplicate object IDs, broken references, malformed stream boundaries)
-- **Object count discrepancy >10%** (MuPDF vs any) → Medium + 20 pts — duplicate object numbers or hidden objects in compressed object streams
+| Check | Severity | Score | What it indicates |
+|---|---|---|---|
+| Page count disagreement | High | +35 | Hidden incremental update, shadow object tree, parser-confusion exploit |
+| JavaScript visibility discrepancy | Critical | +50 | JS hidden behind parser-specific quirks: duplicate object IDs, broken references, malformed stream boundaries |
+| Object count discrepancy >10% | Medium | +20 | Duplicate object numbers or hidden objects in compressed object streams |
+| Encryption status mismatch | Critical | +40 | Parser-specific `/Encrypt` dictionary handling — encryption oracle attack indicator |
+| PDF version mismatch | Medium | +15 | Conflicting version headers activate parser-specific code paths |
+| AcroForm visibility discrepancy | Medium | +15 | Hidden form action trees carrying JavaScript, XFA, or submit exfiltration actions |
+| Embedded file count discrepancy | High | +25 | Attachments hidden in non-standard EmbeddedFiles locations invisible to some parsers |
 
-**Why it matters:** Attackers craft PDFs where one parser recovers hidden exploit objects that another ignores entirely. Standard single-parser scanners miss this by design. This is the same technique used by browser security teams comparing Chromium vs Firefox DOM construction.
+**Why it matters:** Attackers craft PDFs where one parser recovers hidden exploit objects, scripts, or attachments that another ignores entirely. Standard single-parser scanners miss this by design. Parser disagreement on any of the 8 dimensions is a strong indicator of deliberate evasion.
 
 ### Engine ⑲ — Polyglot / Embedded Binary Detection
 
@@ -638,7 +647,7 @@ The tab bar uses a pill-style design with background highlighting on hover and a
 | **🌐 URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
 | **📦 Streams** | Table of displayed streams (top 40 of N total; explains decompressed count vs skipped images/fonts). Columns: xref, type, decompressed size, Shannon entropy bar, suspicious flag, matched pattern list. Suspicious streams highlighted in amber. |
 | **🧠 ML** | ML Intelligence Engine panel: malicious probability bar, model version, contextual dampening/amplification note, Explainable ML feature importance chart, false-positive / confirm-threat feedback buttons. Tab badge shows current malicious % score. |
-| **🔬 Parsing** | Differential Parsing Detection panel: per-parser (PyMuPDF / pdfminer / qpdf) page count, object count, JavaScript detection, embedded file count. Mismatch badges highlight discrepancies that indicate parser-evasion attacks. |
+| **🔬 Parsing** | Differential Parsing Detection panel: five parser cards (MuPDF · Poppler · Ghostscript · qpdf · pdfminer), each showing pages, objects, PDF version, JavaScript, encryption, AcroForm, embedded files, linearized, OpenAction, annotations, structural integrity. Seven mismatch badge types (Critical/High/Medium) highlight parser-evasion discrepancies. |
 | **🧬 Polyglot** | Polyglot/Embedded Binary Detection panel (magic-byte hits with type and risk badge) + JavaScript AST Deobfuscation panel (obfuscation findings — dynamic eval, fromCharCode arrays, unescape calls, large numeric arrays, new Function). |
 | **🏷️ Metadata** | Document metadata KV table (title, author, subject, keywords, creator, producer, dates, format, XMP flag) + structure info KV table (version, EOF markers, xref tables, linearized, binary comment, stream counts) |
 
@@ -653,7 +662,7 @@ After a scan, two sanitize methods are available using the session token — the
 
 ---
 
-## Edit PDF — 15 Annotation Tools
+## Edit PDF — 15 Annotation Tools + Form Builder
 
 [/tools/edit.php](https://pqpdf.com/tools/edit.php)
 
@@ -676,6 +685,31 @@ The editor renders each page to a canvas and applies all changes server-side via
 | **Signature** | Open a signature canvas modal (draw with mouse or touch), place result on page. |
 | **QR Code** | Generate a QR code from any URL or text string (via `edit-qr-generate` API), set size, and place on page. |
 | **Stamp** | Insert one of 12 built-in stamps (DRAFT, APPROVED, REJECTED, CONFIDENTIAL, TOP SECRET, VOID, COPY, FINAL, REVISED, REVIEW, NOT APPROVED, PAID) or type a custom stamp text. |
+| **Form Field** | Draw any interactive AcroForm widget onto the page — see Form Builder section below. |
+
+### Form Builder
+
+The Form Field tool creates native, interactive AcroForm widgets embedded in the PDF using PyMuPDF's `page.add_widget()`. Click the **Form Field** toolbar button, pick a widget type from the popover, drag a rectangle on the canvas to define the field area, then set properties in the modal. The field appears as a dashed blue rectangle (with type:name label) while editing, and is written as a real interactive field on Apply & Download.
+
+All 7 PyMuPDF / PDF specification widget types are supported:
+
+| Widget Type | Properties |
+|---|---|
+| **Text** | Field name, default value, multiline, max length, password mode, tooltip, font size, text colour, required, read-only |
+| **CheckBox** | Field name, checked-by-default state, tooltip, font size, text colour, required, read-only |
+| **RadioButton** | Field name (used as group name), option value (string stored when selected), tooltip, font size, text colour, required, read-only |
+| **ListBox** | Field name, choices (one per line), default selection, multi-select, tooltip, font size, text colour, required, read-only |
+| **ComboBox** | Field name, choices (one per line), default selection, editable (allow free text entry), tooltip, font size, text colour, required, read-only |
+| **Signature** | Field name, tooltip, required, read-only |
+| **PushButton** | Field name, button caption text, tooltip, required, read-only |
+
+**Implementation notes:**
+- Widget type constants resolved via `getattr(fitz, 'PDF_WIDGET_TYPE_*', fallback_int)` for cross-version compatibility
+- Field flags (`PDF_FIELD_IS_*`) applied bitwise: `READ_ONLY`, `REQUIRED`, `MULTILINE`, `PASSWORD`, `MULTISELECT`, `EDIT`
+- Text colour set as RGB tuple `(r, g, b)` normalised to 0–1 range; font size via `widget.text_fontsize`
+- Choices for ListBox/ComboBox set via `widget.choice_values = [...]`
+- Fields are stored in the annotations array as `{type: 'form_field', field_type: '...', name: '...', x, y, w, h, ...props}` per page
+- All `form_field` annotation objects survive serialisation through the existing `edit-apply` JSON payload (no special handling needed in the JS serialiser)
 
 ### Additional Edit Features
 
@@ -721,6 +755,37 @@ Pages are displayed as draggable thumbnails in the left sidebar:
 | Page counter | Current / total display |
 | ▶ Next | Next page (keyboard: →) |
 | ⏭ Last | Jump to last page |
+
+---
+
+## Fill PDF Form
+
+[/tools/fill.php](https://pqpdf.com/tools/fill.php)
+
+Detects all interactive AcroForm fields in an uploaded PDF and presents them as a fill-in form in the browser. Supports every standard field type — text inputs, checkboxes, radio buttons, drop-down menus (ComboBox), and list boxes. Values are written back server-side via PyMuPDF and the filled PDF is returned immediately. An optional **Flatten after filling** mode bakes field values into static page content so the document can no longer be edited — useful for archiving, printing, or sharing final versions.
+
+### How it works
+
+1. Upload a PDF containing AcroForm fields — the server runs a PyMuPDF extraction script that reads every widget's `field_type_string`, current value, choices, `on_state`, page index, and bounding rect.
+2. Fields are grouped by page and rendered in the browser as a native HTML form: `<input type="text">` for Text fields, `<input type="checkbox">` for CheckBox, `<input type="radio">` for RadioButton (grouped by field name), `<select>` for ComboBox and ListBox.
+3. After filling in values, clicking **Fill & Download** sends the token, field values JSON, and flatten flag to the server. PyMuPDF opens the original file, iterates all widgets, writes back each value, optionally calls `doc.bake()` to flatten, and streams the result as `application/pdf`.
+4. The download blob is created via `URL.createObjectURL()` — no server storage of the filled file.
+
+### Field type support
+
+| Field Type | Rendered as | Notes |
+|---|---|---|
+| Text | `<input type="text">` | Pre-filled with existing value |
+| CheckBox | `<input type="checkbox">` | Checked when value matches `on_state` |
+| RadioButton | `<input type="radio">` | All options with same name grouped; uses `on_state` for option values |
+| ComboBox | `<select>` | Populated from `choice_values`; current value pre-selected |
+| ListBox | `<select>` | Same as ComboBox |
+| Signature | (skipped) | Signature fields are not fillable via text |
+| PushButton | (skipped) | Action buttons have no fillable value |
+
+### Flatten mode
+
+When **Flatten after filling** is checked, the server calls `doc.bake()` after writing field values. This merges all widget appearances into the page content stream, removing interactivity. The resulting PDF renders identically in all viewers but cannot be re-filled or re-edited through a form interface.
 
 ---
 
