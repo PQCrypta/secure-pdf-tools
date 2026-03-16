@@ -685,7 +685,7 @@ The editor renders each page to a canvas and applies all changes server-side via
 | **Signature** | Open a signature canvas modal (draw with mouse or touch), place result on page. |
 | **QR Code** | Generate a QR code from any URL or text string (via `edit-qr-generate` API), set size, and place on page. |
 | **Stamp** | Insert one of 12 built-in stamps (DRAFT, APPROVED, REJECTED, CONFIDENTIAL, TOP SECRET, VOID, COPY, FINAL, REVISED, REVIEW, NOT APPROVED, PAID) or type a custom stamp text. |
-| **Sticky Note** | Click to place a sticky note annotation at any point on the page. Enter text in the modal, pick a note colour (yellow default). Rendered as a folded-corner icon on the canvas; written as a native `page.add_text_annot()` PDF text annotation with a popup comment on export — visible in Acrobat and all standards-compliant viewers. |
+| **Sticky Note** | Click to place a sticky note annotation at any point on the page. Enter text in the modal, pick a note colour (yellow default). Rendered as a folded-corner icon on the canvas; written as a native `page.add_text_annot()` PDF text annotation with a popup comment on export — visible in Acrobat and all standards-compliant viewers. **Right-click** any sticky note icon to Edit (reopens modal pre-filled) or Delete (records an undo history entry). |
 | **Form Field** | Draw any interactive AcroForm widget onto the page — see Form Builder section below. |
 
 ### Form Builder
@@ -714,7 +714,7 @@ All 7 PyMuPDF / PDF specification widget types are supported:
 
 ### Additional Edit Features
 
-- **Bookmark editor** — open the Bookmarks panel to build a navigable table of contents: add bookmark entries by title and page number (defaulting to the current page), reorder by adding in sequence, delete individual entries. On Apply & Download, bookmarks are written to the PDF via `out_doc.set_toc()`, creating a native PDF outline visible in all viewers that support bookmarks (Acrobat, Chrome, Firefox, Preview, etc.)
+- **Bookmark editor** — open the Bookmarks panel to build a navigable table of contents: add bookmark entries by title and page number (defaulting to the current page), delete with the ✕ button, or **right-click any row** to Edit (pre-fills the form for in-place update) or Delete. On Apply & Download, bookmarks are written to the PDF via `out_doc.set_toc()`, creating a native PDF outline visible in all viewers that support bookmarks (Acrobat, Chrome, Firefox, Preview, etc.)
 - **Page numbering** — auto-add page numbers with position (top/bottom/left/right), format (1 / Page 1 / 1 of 10), start number, font size, and colour
 - **Headers & footers** — insert header and footer text with alignment, font size, and colour
 - **Insert blank page** — add a blank page before or after the current page; also supports creating a new blank PDF from scratch
