@@ -1318,10 +1318,10 @@ The zero-retention architecture (no file persistence, no cloud forwarding, ephem
 PQ PDF is a free public service with no formal SLA. There is no guaranteed uptime, no support tier, and no compensated downtime.
 
 **Q: How do I report a security vulnerability?**
-Email **security@pqpdf.com** with a description of the issue. We aim to acknowledge reports within 48 hours and publish fixes without unnecessary delay. Please allow reasonable time for remediation before public disclosure.
+Email **contact@pqcrypta.com** with a description of the issue. We aim to acknowledge reports within 48 hours and publish fixes without unnecessary delay. Please allow reasonable time for remediation before public disclosure.
 
 **Q: How do I request a security review or integration discussion for enterprise use?**
-Use the [contact form](https://pqpdf.com/contact/) or email **contact@pqpdf.com** with the subject line `Enterprise / Security Review`. Include your organisation name, use-case description, and any specific compliance requirements.
+Use the [contact form](https://pqpdf.com/contact/) or email **contact@pqcrypta.com** with the subject line `Enterprise / Security Review`. Include your organisation name, use-case description, and any specific compliance requirements.
 
 ---
 
