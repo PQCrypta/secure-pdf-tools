@@ -75,7 +75,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 |---|---|---|
 | **Add Watermark** | [/tools/watermark.php](https://pqpdf.com/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
 | **Sign PDF** | [/tools/sign.php](https://pqpdf.com/tools/sign.php) | Three signature input methods: draw (canvas with touch support), type (text-rendered), or upload an image. Place on first/last/custom page with x/y/size controls. Live placement preview: after drawing, typing, or uploading a signature, it is composited directly onto a rendered page 1 canvas at the chosen position and size — updates in real time as you move the position selectors or drag the size slider. Optional cryptographic metadata. |
-| **Edit PDF** | [/tools/edit.php](https://pqpdf.com/tools/edit.php) | Full page-by-page visual editor with 16 annotation tools, an interactive form builder, and a bookmark editor. Annotation tools include sticky notes (PDF text annotations with popups) and a bookmark panel for building a navigable table of contents. Draws AcroForm widgets (Text, CheckBox, RadioButton, ListBox, ComboBox, Signature, PushButton) directly onto the PDF canvas, then commits everything server-side via PyMuPDF. See full details below. |
+| **Edit PDF** | [/tools/edit.php](https://pqpdf.com/tools/edit.php) | Full page-by-page visual editor with 16 annotation tools, an interactive form builder, and a bookmark editor. Tools: text, freehand draw, eraser, line, arrow, rectangle and ellipse (both with independent fill colour), highlight, whiteout, strikethrough, underline, image insert, signature, QR code, stamps, and sticky notes. Bookmark panel writes a native PDF table of contents via `set_toc()`. Draws AcroForm widgets (Text, CheckBox, RadioButton, ListBox, ComboBox, Signature, PushButton) directly onto the PDF canvas, then commits everything server-side via PyMuPDF. See full details below. |
 | **Fill PDF Form** | [/tools/fill.php](https://pqpdf.com/tools/fill.php) | Detect and fill all interactive AcroForm fields in any PDF — text inputs, checkboxes, radio buttons, drop-down menus, and list boxes. Values are written server-side via PyMuPDF. Optional flatten-after-filling bakes field values into static page content for archiving or sharing. |
 | **Compare PDFs** | [/tools/compare.php](https://pqpdf.com/tools/compare.php) | Visual diff of two PDFs. Configure DPI (72/96/150/300) and sensitivity. Side-by-side page 1 canvas previews render immediately when each file is selected. Outputs a highlighted diff PDF with change regions marked. |
 | **Extract Text** | [/tools/extract-text.php](https://pqpdf.com/tools/extract-text.php) | Export all text to `.txt`. Options: layout preservation, text encoding, custom page range. |
@@ -671,12 +671,12 @@ The editor renders each page to a canvas and applies all changes server-side via
 | Tool | Description |
 |---|---|
 | **Text** | Click to place a text box. Font family (Helvetica / Times / Courier), font size, bold, italic, left/centre/right alignment, colour. |
-| **Draw** | Freehand pen with configurable line width (slider with live preview) and colour. |
+| **Freehand Draw** | Freehand pen with configurable line width (slider with live preview) and colour. |
 | **Eraser** | Freehand white-stroke eraser — paints white over any content. Line width scales with the width slider (2× multiplier, minimum 10 pt). Applied as a white draw path via PyMuPDF on export. |
 | **Line** | Straight line with stroke width and colour. |
 | **Arrow** | Directional arrow annotation. |
-| **Rectangle** | Rectangle with fill/outline toggle, independent fill colour, fill opacity, stroke width, and colour. |
-| **Ellipse** | Ellipse with fill/outline toggle, independent fill colour, fill opacity, stroke width, and colour. |
+| **Rectangle** | Rectangle with fill/outline toggle, **independent fill colour** (separate from stroke colour), fill opacity, stroke width, and stroke colour. |
+| **Ellipse** | Ellipse with fill/outline toggle, **independent fill colour** (separate from stroke colour), fill opacity, stroke width, and stroke colour. |
 | **Highlight** | Translucent highlight overlay with configurable opacity. |
 | **Whiteout** | Solid white box to cover content. |
 | **Strikethrough** | Strikethrough line over selected text area. |
