@@ -1054,12 +1054,22 @@ A 20-page document at 200 DPI takes approximately 100 seconds. The UI shows a li
 ```
 pdf/
 ├── index.php                  # Hub — tool cards, search, drag-drop, IndexedDB file transfer
-├── api.php                    # Single POST endpoint — all 41 operations
+├── api.php                    # Single POST endpoint — all 45 operations
+├── api_config.php             # API config bootstrap — loads central server config
+├── about.php                  # About page — all 45 tools explained, privacy model, engine architecture, security controls
+├── about.css                  # Styles for the about page
+├── sitemap.php                # Dynamic XML sitemap with lastmod timestamps from filemtime()
+├── sitemap.xml                # Static sitemap fallback
+├── robots.txt                 # Crawl directives
+├── favicon.ico                # Site favicon (ICO)
+├── favicon.svg                # Site favicon (SVG)
 ├── README.md                  # This file
 ├── css/
 │   ├── pdf.css                # Complete UI styles
 │   ├── pdf-background.css     # Canvas container
 │   ├── pdf-cursor.css         # Ink trail cursor
+│   ├── pdf-enhanced.css       # Cutting-edge UI enhancements (@property, scroll-driven animations, container queries)
+│   ├── fill.css               # Fill PDF form tool styles
 │   └── scan.css               # Threat scanner styles (risk colours, engine chips, stream table, score meter)
 ├── js/
 │   ├── pdf.js                 # Hub init, search, drag-drop routing
@@ -1067,15 +1077,20 @@ pdf/
 │   ├── pdf-cursor.js          # Cursor ink trail
 │   ├── pdf-processing.js      # Global 3D processing overlay + cross-page hub-drop file delivery via IndexedDB
 │   ├── pdf-page-preview.js    # Shared ES module: PdfPagePreview, PdfSplitPreview, PdfReorderPreview, PdfMergePreview, renderSinglePagePreview
+│   ├── pdf-enhanced.js        # Cutting-edge UI enhancements
+│   ├── toolbar-drag.js        # PDF editor toolbar drag-to-reorder (CSP-compliant)
 │   └── tools/                 # All tool scripts are ES modules (type="module")
 │       ├── upload.js          # PdfUploadUtil — shared XHR upload handler
 │       ├── scan.js            # Threat scanner — engine strip animation, 8-tab report renderer (Summary/ML/Parsing/Polyglot/Threats/URLs/Streams/Metadata), clickable stat cards, ML panel (probability bar, explainable feature importance, feedback), differential parsing panel, polyglot panel, JS AST panel, sanitize flow
+│       ├── camera-scan.js     # Camera document scanner — live viewfinder, Sobel edge overlay, perspective handles, multi-page gallery, OCR mode
 │       ├── merge.js           # Thumbnail preview + drag reorder; upload progress bar; server-phase cycling status messages (6 rotating messages while Ghostscript merges)
 │       ├── split.js           # Cut-point preview + range/interval modes
 │       ├── compress.js        # DPI slider, before/after split-canvas preview, size comparison
 │       ├── convert.js         # PDF → Word/ODT/RTF/TXT + format fidelity star indicator
 │       ├── watermark.js       # 8-position, per-page, font style, live canvas watermark preview
 │       ├── sign.js            # Draw/type/upload tabs, canvas, live placement preview (PDF.js composite), crypto metadata
+│       ├── sign-request.js    # Individual signer page — signature mode tabs, page/position placement, optional PAdES layer
+│       ├── esign.js           # Multi-party e-signature — signer list, sequential/parallel mode, live status polling
 │       ├── rotate.js          # Canvas preview, odd/even/range, decimal angles
 │       ├── protect.js         # Dual-mode AES + PQC, key management
 │       ├── unlock.js          # Encryption type detection (client-side header scan), AES badge, PQC bundle routing
@@ -1089,9 +1104,21 @@ pdf/
 │       ├── reorder.js         # Drag-and-drop thumbnail grid
 │       ├── delete-pages.js    # Thumbnail click selection
 │       ├── pdfa.js            # Level selector (1b/2b/3b)
+│       ├── pdfx.js            # PDF/X standard selector (PDF/X-1a, X-3, X-4)
+│       ├── nup.js             # N-up/imposition — grid preview, booklet mode
+│       ├── deskew.js          # Per-page interactive crop editor — 8-handle drag box, auto-detection, page navigator
+│       ├── outline-editor.js  # Outline/bookmark editor — add, edit, delete, reorder entries
+│       ├── pades.js           # PAdES-B signing — visual signature placement, LTV timestamp
+│       ├── a11y.js            # Accessibility checker — tagged PDF, alt text, reading order, colour contrast
+│       ├── font-inspector.js  # Font inspector — enumerate fonts, embedding status, subset flags
+│       ├── color-inspect.js   # Colour inspector — spot colours, ICC profiles, overprint settings
+│       ├── table-json.js      # Table → JSON extraction with preview
 │       ├── word-to-pdf.js     # Format fidelity indicator
 │       ├── excel-to-pdf.js    # Sheet selector (fetches sheet names from uploaded file)
 │       ├── ppt-to-pdf.js      # Slide selector (fetches slide titles from uploaded file)
+│       ├── pdf-to-ppt.js      # PDF → PPTX — page count display, download
+│       ├── pdf-to-html.js     # PDF → HTML — styled output preview
+│       ├── pdf-to-md.js       # PDF → Markdown — heading detection, code block extraction
 │       ├── image-to-pdf.js
 │       ├── pdf-to-excel.js
 │       ├── html-to-pdf.js
@@ -1103,6 +1130,17 @@ pdf/
 │       └── workflow.js        # Visual step builder, drag reorder; 15 step types incl. sign (3 modes), redact, split-every-N (ZIP output)
 ├── scripts/                   # Python helpers (server-side operations)
 │   ├── pdf_to_excel.py        # Table extraction helper (PyMuPDF + openpyxl)
+│   ├── pdf_to_ppt.py          # PDF → PPTX (PyMuPDF page rasterisation + python-pptx)
+│   ├── pdf_to_html.py         # PDF → HTML (PyMuPDF get_text("html"), positioned spans)
+│   ├── pdf_to_md.py           # PDF → Markdown (heading detection, code block extraction)
+│   ├── nup.py                 # N-up/imposition (PyMuPDF show_pdf_page, booklet reorder)
+│   ├── deskew.py              # Auto-crop + rotation correction (PyMuPDF content bbox, per-page overrides)
+│   ├── pades_sign.py          # PAdES-B signing with optional LTV timestamp (pyhanko)
+│   ├── outline_write.py       # Outline/bookmark write-back (PyMuPDF set_toc)
+│   ├── a11y_check.py          # Accessibility analysis (tagged PDF, alt text, reading order, contrast)
+│   ├── font_inspect.py        # Font enumeration (PyMuPDF get_fonts, embedding + subset flags)
+│   ├── color_inspect.py       # Colour inspection (spot colours, ICC profiles, overprint)
+│   ├── table_json.py          # Table → JSON extraction (PyMuPDF find_tables)
 │   └── url_to_pdf.cjs         # URL-to-PDF conversion helper (Node.js)
 ├── ml/                        # ML Intelligence Engine (Engine ⑰)
 │   ├── train.py               # Training script — IsolationForest + RandomForest, runs every 30 min via cron
@@ -1116,12 +1154,15 @@ pdf/
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
     ├── scan.php               # PDF Threat Scanner — 20-engine static + dynamic + ML + differential + polyglot + AST analysis + sanitize
+    ├── camera-scan.php        # Camera/photo document scanner — live viewfinder, perspective correction, OCR mode
     ├── merge.php
     ├── split.php
     ├── compress.php
     ├── convert.php
     ├── watermark.php
     ├── sign.php
+    ├── sign-request.php       # Individual signer page for esign workflow (?t=token&s=signer)
+    ├── esign.php              # Multi-party e-signature — initiator uploads, adds signers, tracks status
     ├── rotate.php
     ├── protect.php
     ├── unlock.php
@@ -1135,9 +1176,21 @@ pdf/
     ├── reorder.php
     ├── delete-pages.php
     ├── pdfa.php
+    ├── pdfx.php               # PDF/X conversion (PDF/X-1a, X-3, X-4 via Ghostscript)
+    ├── nup.php                # N-up/imposition (2-up, 4-up, 6-up, 8-up, 9-up, booklet)
+    ├── deskew.php             # Auto-crop + deskew with per-page interactive crop editor
+    ├── outline-editor.php     # Outline/bookmark editor — add, rename, delete, reorder
+    ├── pades.php              # PAdES-B LTV signing with visual signature placement
+    ├── a11y.php               # Accessibility checker (tagged PDF, alt text, reading order, colour contrast)
+    ├── font-inspector.php     # Font inspector — name, type, encoding, embedded, subset, pages
+    ├── color-inspect.php      # Colour inspector — spot colours, ICC profiles, overprint settings
+    ├── table-json.php         # Table → JSON extraction
     ├── word-to-pdf.php
     ├── excel-to-pdf.php
     ├── ppt-to-pdf.php
+    ├── pdf-to-ppt.php         # PDF → PowerPoint (PPTX)
+    ├── pdf-to-html.php        # PDF → HTML
+    ├── pdf-to-md.php          # PDF → Markdown
     ├── image-to-pdf.php
     ├── pdf-to-excel.php
     ├── html-to-pdf.php
@@ -1155,7 +1208,8 @@ pdf/
 
 | Page | URL | Description |
 |---|---|---|
-| **Home / PDF Tools** | [pqpdf.com](https://pqpdf.com) | Tool hub — all 32 PDF tools |
+| **Home / PDF Tools** | [pqpdf.com](https://pqpdf.com) | Tool hub — all 45 PDF tools |
+| **About** | [pqpdf.com/about.php](https://pqpdf.com/about.php) | Complete guide to PQ PDF — all 45 tools explained, privacy model, engine architecture, and security controls |
 | **Contact** | [pqpdf.com/contact](https://pqpdf.com/contact/) | Contact form with AI behavioural human verification |
 | **Legal Notice** | [pqpdf.com/legal/legal.php](https://pqpdf.com/legal/legal.php) | Terms of use, file handling guarantee, IP rights |
 | **Privacy Policy** | [pqpdf.com/legal/privacy.php](https://pqpdf.com/legal/privacy.php) | Data handling, GDPR rights, zero-retention confirmation |
