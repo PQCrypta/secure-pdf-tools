@@ -29,7 +29,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 
 ---
 
-## Tools (32)
+## Tools (44)
 
 ### Core Manipulation
 
@@ -45,6 +45,8 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 | **Repair PDF** | [/tools/repair.php](https://pqpdf.com/tools/repair.php) | Reconstruct corrupted or malformed PDFs via Ghostscript. On upload, PDF.js diagnoses the file client-side: checks the PDF header, attempts to parse the cross-reference table and content streams, and renders pages 1–3. A scan card reports detected issues (xref errors, stream corruption, truncation, encryption) as red badges — or confirms the file is readable with a green badge and page count. |
 | **Flatten PDF** | [/tools/flatten.php](https://pqpdf.com/tools/flatten.php) | Flatten form fields, annotations, and layers into the page content layer. On upload, PDF.js scans the document client-side and shows a summary card — e.g. "3 form fields · 2 annotations · 1 layer — all will be made permanent" — with amber badges per element type. Shows a green "Already flat" badge if no interactive elements are found. |
 | **Grayscale / B&W** | [/tools/grayscale.php](https://pqpdf.com/tools/grayscale.php) | Convert to grayscale or pure black-and-white. Live before/after split-canvas preview rendered from page 1 — color on the left, grayscale simulation on the right. |
+| **N-up / Imposition** | [/tools/nup.php](https://pqpdf.com/tools/nup.php) | Arrange multiple PDF pages on each output sheet: 2-up (2×1), 4-up (2×2), 6-up (2×3), 8-up (2×4), 9-up (3×3), or booklet imposition (pages re-ordered and paired for saddle-stitch binding). Uses PyMuPDF `show_pdf_page()` — vector output, no rasterisation. Page size and orientation selectable. |
+| **Auto-crop / Deskew** | [/tools/deskew.php](https://pqpdf.com/tools/deskew.php) | Remove excess white margins and correct page rotation. Three modes: auto-crop only, fix rotation only, or both. Auto-crop detects the tight content bounding box across text blocks, vector drawings, and raster images (via PyMuPDF) with a 20pt safety margin. Fix rotation bakes the page's `/Rotate` flag into the content stream so output pages have `rotation=0` in all viewers — aspect ratio and coordinate mapping are preserved even for 90°/180°/270° rotated pages via an offset target-rect approach. **Per-page interactive crop editor**: after upload, each page is rendered with a live draggable crop box — 8 handles (4 corners + 4 edge midpoints) let you resize or move the keep area; drag inside the box to pan it. Auto-detection runs per-page using PDF.js text extraction and updates the handles immediately. Manual adjustments are stored per-page. "Reset page" re-runs auto-detection. "Apply to all pages" normalises the current crop as fractions and applies it proportionally to every page. Page navigator browses the full document before committing. Per-page overrides are sent to the server as a JSON array of `{page, x0, y0, x1, y1}` in PDF display-space points and applied in the Python pipeline. Pages without manual overrides continue to use auto-detection. |
 
 ### Format Conversion
 
@@ -59,6 +61,10 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 | **PowerPoint → PDF** | [/tools/ppt-to-pdf.php](https://pqpdf.com/tools/ppt-to-pdf.php) | Convert `.ppt` / `.pptx` / `.odp` via LibreOffice. Slide selector — fetches slide titles from the uploaded file and lets you choose which slides to include. |
 | **Images → PDF** | [/tools/image-to-pdf.php](https://pqpdf.com/tools/image-to-pdf.php) | Pack JPEG / PNG / WebP / BMP / TIFF images into a single PDF via ImageMagick. |
 | **HTML → PDF** | [/tools/html-to-pdf.php](https://pqpdf.com/tools/html-to-pdf.php) | Upload `.html` / `.htm` and convert via LibreOffice. |
+| **PDF → PowerPoint** | [/tools/pdf-to-ppt.php](https://pqpdf.com/tools/pdf-to-ppt.php) | Convert PDF pages to a PPTX presentation. Each page is rendered at 150 DPI via PyMuPDF and placed as a full-bleed image on its own slide using python-pptx. Slide dimensions match the original page aspect ratio. |
+| **PDF → HTML** | [/tools/pdf-to-html.php](https://pqpdf.com/tools/pdf-to-html.php) | Convert PDF pages to a styled HTML document using PyMuPDF `page.get_text("html")`, which preserves font, size, and positioned text spans. Pages are separated by CSS `page-break-after` divs. Produces a single self-contained `.html` file with print-friendly styling. |
+| **PDF → Markdown** | [/tools/pdf-to-md.php](https://pqpdf.com/tools/pdf-to-md.php) | Convert PDF to GitHub-flavoured Markdown using **pymupdf4llm** — the latest AI/LLM-optimised layout analysis engine built on PyMuPDF 1.27 + ONNX. Detects headings, paragraphs, tables, code blocks, and list structures. Produces clean `.md` ideal for RAG pipelines, LLM ingestion, and documentation workflows. |
+| **PDF/X Output** | [/tools/pdfx.php](https://pqpdf.com/tools/pdfx.php) | Convert a PDF to print-industry PDF/X format (PDF/X-1a, PDF/X-3, or PDF/X-4) via Ghostscript with CMYK colour conversion, `/prepress` quality settings, and configurable render intent. Ensures all fonts are embedded and colour data is print-shop compliant. |
 
 ### Protection & Security
 
@@ -69,18 +75,29 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 | **Unlock PDF** | [/tools/unlock.php](https://pqpdf.com/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/tools/redact.php](https://pqpdf.com/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
 
-### Content & Annotation
+### Protection & Security
 
 | Tool | Link | Description |
 |---|---|---|
 | **Add Watermark** | [/tools/watermark.php](https://pqpdf.com/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
 | **Sign PDF** | [/tools/sign.php](https://pqpdf.com/tools/sign.php) | Three signature input methods: draw (canvas with touch support), type (text-rendered), or upload an image. Place on first/last/custom page with x/y/size controls. Live placement preview: after drawing, typing, or uploading a signature, it is composited directly onto a rendered page 1 canvas at the chosen position and size — updates in real time as you move the position selectors or drag the size slider. Optional cryptographic metadata. |
+| **PAdES LTV Signing** | [/tools/pades.php](https://pqpdf.com/tools/pades.php) | Cryptographic PDF signing compliant with **PAdES** (PDF Advanced Electronic Signatures, ETSI EN 319 102-1). Uses **pyhanko 0.34** to apply an incremental CMS/PKCS#7 signature over an ephemeral RSA-2048 self-signed certificate. Supports signer name, reason, and location metadata embedded in the signature dictionary. The signature is written as an incremental update — the original document content is never modified. LTV (Long-Term Validation) extension headers are included for future timestamp chaining. |
+
+### Content & Annotation
+
+| Tool | Link | Description |
+|---|---|---|
 | **Edit PDF** | [/tools/edit.php](https://pqpdf.com/tools/edit.php) | Full page-by-page visual editor with 16 annotation tools, an interactive form builder, and a bookmark editor. Tools: text, freehand draw, eraser, line, arrow, rectangle and ellipse (both with independent fill colour), highlight, whiteout, strikethrough, underline, image insert, signature, QR code, stamps, and sticky notes. Bookmark panel writes a native PDF table of contents via `set_toc()`. Draws AcroForm widgets (Text, CheckBox, RadioButton, ListBox, ComboBox, Signature, PushButton) directly onto the PDF canvas, then commits everything server-side via PyMuPDF. See full details below. |
 | **Fill PDF Form** | [/tools/fill.php](https://pqpdf.com/tools/fill.php) | Detect and fill all interactive AcroForm fields in any PDF — text inputs, checkboxes, radio buttons, drop-down menus, and list boxes. Values are written server-side via PyMuPDF. Optional flatten-after-filling bakes field values into static page content for archiving or sharing. |
 | **Compare PDFs** | [/tools/compare.php](https://pqpdf.com/tools/compare.php) | Visual diff of two PDFs. Configure DPI (72/96/150/300) and sensitivity. Side-by-side page 1 canvas previews render immediately when each file is selected. Outputs a highlighted diff PDF with change regions marked. |
 | **Extract Text** | [/tools/extract-text.php](https://pqpdf.com/tools/extract-text.php) | Export all text to `.txt`. Options: layout preservation, text encoding, custom page range. |
 | **PDF Info** | [/tools/pdf-info.php](https://pqpdf.com/tools/pdf-info.php) | Display full metadata: title, author, subject, keywords, creator, producer, page count, dimensions, PDF version, encryption status, form type, tagged flag, page rotation, fast web view optimisation, creation and modification dates, permission flags. Shows a quick canvas preview of page 1 alongside the metadata. |
 | **OCR PDF** | [/tools/ocr.php](https://pqpdf.com/tools/ocr.php) | Optical Character Recognition for scanned and image-based PDFs. Powered by Tesseract 5 LSTM neural network. Three output formats: plain text (.txt), searchable PDF (original images + invisible text layer so the document becomes copyable and searchable), or a ZIP containing both. DPI control (150/200/300), four page segmentation modes (auto, single column, single block, sparse text), custom page ranges, up to 100 pages per job. Returns OCR confidence score (per-word Tesseract TSV confidence averaged across all pages), word count, and character count. Live text preview tab in the browser — preview extracted text without downloading. |
+| **Bookmarks / Outline Editor** | [/tools/outline-editor.php](https://pqpdf.com/tools/outline-editor.php) | Standalone bookmark and outline editor. Upload a PDF to load its existing table of contents. Add, rename, reorder, delete, and adjust the level (1–4) of each entry; each bookmark row has a page-number input validated against the document's actual page count. Uses PyMuPDF `doc.get_toc()` / `doc.set_toc()` to read and write the native PDF outline structure. |
+| **Accessibility Checker** | [/tools/a11y.php](https://pqpdf.com/tools/a11y.php) | WCAG 2.1 / PDF/UA compliance audit. Runs 8 checks via PyMuPDF: document title (WCAG 2.4.2), language metadata (WCAG 3.1.1), tagged PDF structure (PDF/UA-1 §7.1), image alt-text presence (WCAG 1.1.1), reading order consistency (WCAG 1.3.2), font embedding (PDF/UA-1 §7.21), bookmark navigation for multi-page documents (WCAG 2.4.5), and page-size consistency. Returns a pass/fail report with WCAG criterion references, impact levels, and an overall grade (A–F). |
+| **Font Inspector** | [/tools/font-inspector.php](https://pqpdf.com/tools/font-inspector.php) | Enumerate all fonts used across every page of a PDF. For each font: name, type (Type1, TrueType, CIDFont, etc.), encoding, embedded status, subset status (presence of `+` prefix in the BaseFont name), and the list of pages it appears on. Flags non-embedded fonts in red — critical for print submission and PDF/UA compliance. |
+| **Color Profile / CMYK Inspector** | [/tools/color-inspect.php](https://pqpdf.com/tools/color-inspect.php) | Audit a PDF's colour space usage for print-readiness. Inspects embedded raster images via PyMuPDF `extract_image()` — detects DeviceGray, DeviceRGB, and DeviceCMYK image data per page. Runs Ghostscript `inkcov` device to compute per-page CMYK ink coverage. Flags RGB images that would need conversion for professional print output. Reports overall print-readiness verdict. |
+| **Table → JSON** | [/tools/table-json.php](https://pqpdf.com/tools/table-json.php) | Extract structured tables from PDF and export as JSON. Uses **pdfplumber** with `lines_strict` strategy (explicit table borders detected from PDF path operators) and falls back to text-position heuristics. First row is treated as column headers; remaining rows become an array of objects keyed by header. Output is a `.json` file containing `{table_count, page_count, tables:[{id, page, rows, cols, headers, data:[{col:val}]}]}`. |
 
 ### Automation
 
@@ -121,7 +138,13 @@ Browser (HTTPS / HTTP2)
 │                    │  LibreOffice  — Office↔PDF      │   │
 │                    │  ImageMagick  — image→PDF       │   │
 │                    │  Tesseract 5  — OCR (LSTM)      │   │
-│                    │  PyMuPDF/Python — scan engines  │   │
+│                    │  PyMuPDF 1.27 — edit, nup,      │   │
+│                    │    deskew, outline, a11y,       │   │
+│                    │    font-inspect, color-inspect  │   │
+│                    │  pymupdf4llm — PDF → Markdown   │   │
+│                    │  python-pptx — PDF → PPTX       │   │
+│                    │  pdfplumber — table → JSON      │   │
+│                    │  pyhanko 0.34 — PAdES LTV sign  │   │
 │                    │  ExifTool, YARA, ClamAV         │   │
 │                    │  PeePDF, strace/unshare, acorn  │   │
 │                    │  scikit-learn (IsolationForest  │   │
