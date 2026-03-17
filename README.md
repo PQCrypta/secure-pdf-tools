@@ -29,7 +29,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 
 ---
 
-## Tools (44)
+## Tools (43)
 
 ### Core Manipulation
 
@@ -80,8 +80,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 | Tool | Link | Description |
 |---|---|---|
 | **Add Watermark** | [/tools/watermark.php](https://pqpdf.com/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
-| **Sign PDF** | [/tools/sign.php](https://pqpdf.com/tools/sign.php) | Three signature input methods: draw (canvas with touch support), type (text-rendered), or upload an image. Place on first/last/custom page with x/y/size controls. Live placement preview: after drawing, typing, or uploading a signature, it is composited directly onto a rendered page 1 canvas at the chosen position and size — updates in real time as you move the position selectors or drag the size slider. Optional cryptographic metadata. |
-| **PAdES LTV Signing** | [/tools/pades.php](https://pqpdf.com/tools/pades.php) | Cryptographic PDF signing compliant with **PAdES** (PDF Advanced Electronic Signatures, ETSI EN 319 102-1). Uses **pyhanko 0.34** to apply an incremental CMS/PKCS#7 signature over an ephemeral RSA-2048 self-signed certificate. Supports signer name, reason, and location metadata embedded in the signature dictionary. The signature is written as an incremental update — the original document content is never modified. LTV (Long-Term Validation) extension headers are included for future timestamp chaining. |
+| **Sign PDF & PAdES** | [/tools/sign.php](https://pqpdf.com/tools/sign.php) | Four signature modes in one tool. **Draw** — freehand on a canvas with full touch support. **Type** — name rendered as a signature image via ImageMagick (DejaVu-Sans-Oblique). **Upload** — any PNG/JPEG used as the signature image. **PAdES / Crypto Only** — invisible cryptographic signature with no image drawn on the page, verifiable in Adobe Reader's Signatures panel. Visual modes support placement controls: first/last/all/custom page, left/center/right × top/middle/bottom position grid, and a size slider (40–300 pt). Live placement preview composites the signature onto a rendered page 1 canvas in real time as position and size are adjusted. All modes optionally embed a cryptographic digital signature: signer name (required), email, reason, and location metadata. Certificate source is either auto-generated ephemeral RSA-2048 self-signed or user-supplied `.p12`/`.pfx`. PAdES mode uses **pyhanko 0.34** for an incremental CMS/PKCS#7 signature written as an incremental update (original content never modified) — compliant with PAdES-B (ETSI EN 319 102-1). Visual modes use **endesive** for the embedded crypto layer. `/tools/pades.php` 301-redirects to `/tools/sign.php?tab=pades`, preserving existing links and SEO. |
 
 ### Content & Annotation
 
