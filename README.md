@@ -66,7 +66,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 | **PDF → Markdown** | [/tools/pdf-to-md.php](https://pqpdf.com/tools/pdf-to-md.php) | Convert PDF to GitHub-flavoured Markdown using **pymupdf4llm** — the latest AI/LLM-optimised layout analysis engine built on PyMuPDF 1.27 + ONNX. Detects headings, paragraphs, tables, code blocks, and list structures. Produces clean `.md` ideal for RAG pipelines, LLM ingestion, and documentation workflows. |
 | **PDF/X Output** | [/tools/pdfx.php](https://pqpdf.com/tools/pdfx.php) | Convert a PDF to print-industry PDF/X format (PDF/X-1a, PDF/X-3, or PDF/X-4) via Ghostscript with CMYK colour conversion, `/prepress` quality settings, and configurable render intent. Ensures all fonts are embedded and colour data is print-shop compliant. |
 
-### Protection & Security
+### Security & Privacy
 
 | Tool | Link | Description |
 |---|---|---|
@@ -74,15 +74,10 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 | **Protect PDF** | [/tools/protect.php](https://pqpdf.com/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/tools/unlock.php](https://pqpdf.com/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/tools/redact.php](https://pqpdf.com/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
-
-### Protection & Security
-
-| Tool | Link | Description |
-|---|---|---|
 | **Add Watermark** | [/tools/watermark.php](https://pqpdf.com/tools/watermark.php) | Stamp text watermarks. 8-position placement, opacity, rotation angle, font size, font style, hex colour. Apply to all, odd, even, or custom page ranges. Live canvas preview — page 1 is rendered and the watermark text is drawn over it in real time as you adjust text, opacity, size, colour, and position. |
 | **Sign PDF & PAdES** | [/tools/sign.php](https://pqpdf.com/tools/sign.php) | Four signature modes in one tool. **Draw** — freehand on a canvas with full touch support. **Type** — name rendered as a signature image via ImageMagick (DejaVu-Sans-Oblique). **Upload** — any PNG/JPEG used as the signature image. **PAdES / Crypto Only** — invisible cryptographic signature with no image drawn on the page, verifiable in Adobe Reader's Signatures panel. Visual modes support placement controls: first/last/all/custom page, left/center/right × top/middle/bottom position grid, and a size slider (40–300 pt). Live placement preview composites the signature onto a rendered page 1 canvas in real time as position and size are adjusted. All modes optionally embed a cryptographic digital signature: signer name (required), email, reason, and location metadata. Certificate source is either auto-generated ephemeral RSA-2048 self-signed or user-supplied `.p12`/`.pfx`. PAdES mode uses **pyhanko 0.34** for an incremental CMS/PKCS#7 signature written as an incremental update (original content never modified) — compliant with PAdES-B (ETSI EN 319 102-1). Visual modes use **endesive** for the embedded crypto layer. `/tools/pades.php` 301-redirects to `/tools/sign.php?tab=pades`, preserving existing links and SEO. |
 
-### Content & Annotation
+### Annotate & Inspect
 
 | Tool | Link | Description |
 |---|---|---|
