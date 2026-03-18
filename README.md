@@ -106,9 +106,21 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 ## Architecture
 
 ```
-Browser (HTTPS / HTTP2)
+Browser (HTTPS / HTTP3 / QUIC)
         │
         ▼
+┌──────────────────────────────────────────────────────────┐
+│  pqcrypta-proxy  (Rust, HTTP/3+QUIC, PQC TLS)            │
+│                                                          │
+│  · TLS termination (X25519MLKEM768 hybrid KEM)           │
+│  · Load balancing — least_connections across backends    │
+│  · Circuit breaker — opens after 5 failures              │
+│  · Health polling — GET /health every 10–30 s per pool   │
+│  · Rate limiting — per-IP + JA3/JA4 fingerprint          │
+│  · Security headers injected on all responses            │
+└──────────────────────────┬───────────────────────────────┘
+                           │  HTTP/1.1 (plain, port 8080)
+                           ▼
 ┌──────────────────────────────────────────────────────────┐
 │  Apache HTTP/2  ·  PHP 8.4 FPM                           │
 │                                                          │
@@ -165,9 +177,10 @@ Every operation creates one isolated temp directory, runs entirely inside it, st
 All facts in this section are derived from `api.php`, `_tool_head.php`, and per-tool PHP pages.
 
 ### File Validation
-- Magic-byte check before any processing: `fread($fh, 4) === '%PDF'` — Office/image uploads skip this check, PDF operations require it.
+- **Two-stage PDF validation**: magic-byte check (`fread($fh, 4) === '%PDF'`) followed by a structural `pdfinfo` parse — a polyglot file that starts with `%PDF` but has no parseable cross-reference table fails the second stage.
 - File size limits enforced at upload: **50 MB per file** (`MAX_FILE_SIZE = 52_428_800`), **200 MB total** across all files in a single request (`MAX_TOTAL_SIZE = 209_715_200`).
 - MIME type checked against `['application/pdf', 'application/x-pdf']` for PDF operations.
+- Page range inputs are validated against `/^\d+$/` before casting — malformed ranges like `1-2-3` or `abc` are rejected before any integer conversion.
 
 ### Temporary Workspace Isolation
 - Each request creates `sys_get_temp_dir() . '/pdftool_' . bin2hex(random_bytes(12))` — a 24-character cryptographically random hex suffix, directory mode `0700`.
@@ -184,11 +197,130 @@ All facts in this section are derived from `api.php`, `_tool_head.php`, and per-
 - Poll/keepalive operations (`edit-page`, `edit-ping`, `pdf-scan-poll`) are explicitly exempt to avoid blocking live progress UIs.
 - Limit exceeded returns HTTP 429 with a plain-text message — no silent fail.
 
+### Security Event Logging
+All security-relevant events are written as **NDJSON** (newline-delimited JSON) to `/var/log/pqpdf/security.ndjson`. One event per line; each line is a complete JSON object ingestible by Elasticsearch, Loki, Datadog, Grafana, or `jq`. If the log file is not writable the entry falls back to `error_log()` so no event is silently dropped.
+
+**Logged events:**
+
+| Event | Trigger | Key context fields |
+|---|---|---|
+| `invalid_method` | Non-POST request received | `method` |
+| `unknown_operation` | `operation` param not in allow-list | `attempted_op` (truncated to 64 chars) |
+| `rate_limit_exceeded` | Session hits 10 ops/5 min | `op_count`, `window_s`, `limit` |
+| `file_size_exceeded` | Single file > 50 MB | `size`, `limit`, `filename` |
+| `total_size_exceeded` | Merge batch > 200 MB | `total_sz`, `limit`, `files` |
+| `repeated_pdf_validation_failure` | 3+ consecutive invalid PDF uploads in the same session | `fail_count`, `filename`, `size` |
+| `invalid_page_input` | Page range contains non-integer token (e.g. `abc`, `1-2-3`) | `input` (control chars stripped) |
+
+**Every event carries a common envelope:**
+
+```json
+{
+  "ts": 1742256000,
+  "event": "rate_limit_exceeded",
+  "session": "a3f9c1b04d2e",
+  "ip": "203.0.113.42",
+  "op": "merge",
+  "ua": "Mozilla/5.0 ...",
+  "op_count": 10,
+  "window_s": 300,
+  "limit": 10
+}
+```
+
+- **`session`** — first 12 hex chars of `sha256(session_id())`. Stable across a session; cannot be used to hijack it.
+- **`ip`** — `$_SERVER['REMOTE_ADDR']` by default. Trusts `X-Forwarded-For` only when the `TRUST_PROXY=1` env var is set, preventing IP spoofing via header injection.
+- **`ua`** — user-agent string with non-printable characters stripped, truncated at 200 chars.
+
+**Validation failure threshold:** `$_SESSION['pdf_val_fails']` increments on each bad upload. The `repeated_pdf_validation_failure` event fires when the counter reaches 3 (`VAL_FAIL_THRESHOLD`), then resets — one event per burst, not per file.
+
+**Log path override:** set `PQPDF_SECURITY_LOG=/path/to/custom.ndjson` in the server environment.
+
+**Example `jq` queries:**
+
+```bash
+# All rate-limit hits in the last hour
+jq 'select(.event == "rate_limit_exceeded" and .ts > (now - 3600))' \
+  /var/log/pqpdf/security.ndjson
+
+# Top IPs by event volume
+jq -r '.ip' /var/log/pqpdf/security.ndjson | sort | uniq -c | sort -rn | head -20
+
+# Full history for a specific session
+jq 'select(.session == "a3f9c1b04d2e")' /var/log/pqpdf/security.ndjson
+
+# Repeated validation failures only
+jq 'select(.event == "repeated_pdf_validation_failure")' \
+  /var/log/pqpdf/security.ndjson
+```
+
+**Log rotation** — use standard `logrotate`. Example `/etc/logrotate.d/pqpdf`:
+
+```
+/var/log/pqpdf/security.ndjson {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 www-data adm
+}
+```
+
 ### Content Security Policy
 - Every tool page sets a strict CSP with per-request nonces: `script-src 'nonce-{ext}' 'nonce-{inline}'`.
 - `style-src 'self'` — no inline styles anywhere in the HTML.
 - No `unsafe-inline`, no `unsafe-eval`, no blob worker URLs.
 - All event handlers are registered with `addEventListener()` in external JS modules; no `onclick` or `onload` attributes exist in any HTML.
+
+### Contact Form Spam Protection
+The contact form at `/contact/` layers four independent defences:
+
+1. **AI behavioural verification** — client-side analysis of interaction patterns (mouse movement, timing, keystroke dynamics) via the pqcrypta verification API before the submit button is enabled.
+2. **Honeypot fields** — two hidden inputs (`name="website"`, `name="url"`) that are invisible to humans. The JS explicitly includes their values in the JSON payload; `performSpamCheck()` in `contact/api/submit.php` throws `SpamException` if either field is non-empty.
+3. **Server-side spam patterns** — regex list covering pharmaceutical spam, excessive capitalisation, disposable email domains, and common bot phrases.
+4. **IP-based rate limit** — maximum 5 submissions per hour per IP enforced in PostgreSQL before any email is sent.
+
+### Health Check Endpoint
+`GET /health` — served by `health.php`, routed via Apache `RewriteRule ^/health(/.*)?$ /health.php [L,QSA]`.
+
+**pqcrypta-proxy** polls this endpoint every 10–30 seconds per backend pool (`health_check_path = "/health"` in `proxy-config.toml`). A non-2xx response increments the circuit-breaker failure counter; 5 consecutive failures open the circuit and stop routing to that backend until 3 consecutive successes close it again.
+
+Two modes:
+
+| Request | Latency | Use case |
+|---|---|---|
+| `GET /health` | < 5 ms | Proxy liveness polling, uptime monitors |
+| `GET /health?full=1` | < 2 s | Ops dashboards, post-deploy readiness gate |
+
+**Checks performed:**
+
+| Check | Mode | Critical → 503 | Degraded → 200 |
+|---|---|---|---|
+| Temp dir writable | both | ✓ if not writable | — |
+| Disk free % | both | < 5% | 5–15% |
+| Required tools (`gs`, `pdfunite`, `pdfinfo`, `qpdf`, `python3`) | `?full=1` | ✓ if any missing | — |
+| Optional tools (11 tools incl. `soffice`, `tesseract`, `clamscan`) | `?full=1` | — | ✓ if any missing |
+| Database connectivity | `?full=1` | — | ✓ if unreachable |
+| Security log dir writable | `?full=1` | — | ✓ if not writable |
+
+**Example liveness response:**
+```json
+{
+  "status": "healthy",
+  "ts": 1742256000,
+  "server_id": "server-01",
+  "checks": {
+    "temp_dir": { "status": "ok", "path": "/tmp" },
+    "disk":     { "status": "ok", "free_pct": 33.1, "free_gb": 76.69 }
+  }
+}
+```
+
+**`server_id`** is set via the `SERVER_ID` environment variable on each node (`SERVER_ID=server-01`, `SERVER_ID=server-02`, etc.). Falls back to `gethostname()`. Included in every response so load balancer access logs identify which backend answered each probe.
+
+**`Cache-Control: no-store`** is set on all health responses to prevent proxies from serving a stale healthy status after a node goes down.
 
 ---
 
@@ -1229,10 +1361,19 @@ curl -X POST https://pqpdf.com/api.php \
   -F "operation=compress" \
   -F "quality=ebook" \
   -F "file=@input.pdf" \
+  --dump-header - \
   --output compressed.pdf
 ```
 
 **Quality presets:** `screen` (72 dpi) · `ebook` (150 dpi) · `printer` (300 dpi) · `prepress` (300 dpi, colour-managed)
+
+**Response headers:**
+
+| Header | Example | Description |
+|---|---|---|
+| `X-Original-Size` | `1048576` | Input file size in bytes |
+| `X-Compressed-Size` | `786432` | Output file size in bytes |
+| `X-Compression-Fallback` | `false` | `true` if compression grew the file and the original was returned unchanged |
 
 ### Merge PDFs
 
@@ -1346,6 +1487,25 @@ Returns `{ "status": "running" }` while the 20 engines execute, then the full th
 | OCR page cap | 100 pages per job |
 
 HTTP `429` is returned when the rate limit is exceeded.
+
+### Health Check
+
+```bash
+# Liveness probe — fast, used by pqcrypta-proxy every 10–30 s
+curl https://pqpdf.com/health
+
+# Full readiness check — all tools + DB + log dir
+curl "https://pqpdf.com/health?full=1"
+```
+
+HTTP `200` = healthy or degraded (proxy keeps routing). HTTP `503` = unhealthy (proxy stops routing, circuit-breaker opens).
+
+The `X-Server-ID` response header identifies which backend node answered — useful when tailing logs across a multi-server pool:
+
+```bash
+curl -I https://pqpdf.com/health
+# X-Server-ID: server-01
+```
 
 ---
 
