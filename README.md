@@ -60,7 +60,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 | **Excel → PDF** | [/tools/excel-to-pdf.php](https://pqpdf.com/tools/excel-to-pdf.php) | Convert `.xls` / `.xlsx` / `.ods` via LibreOffice. Sheet selector — fetches sheet names from the uploaded file and lets you pick which sheet(s) to convert. |
 | **PowerPoint → PDF** | [/tools/ppt-to-pdf.php](https://pqpdf.com/tools/ppt-to-pdf.php) | Convert `.ppt` / `.pptx` / `.odp` via LibreOffice. Slide selector — fetches slide titles from the uploaded file and lets you choose which slides to include. |
 | **Images → PDF** | [/tools/image-to-pdf.php](https://pqpdf.com/tools/image-to-pdf.php) | Pack JPEG / PNG / WebP / BMP / TIFF images into a single PDF via ImageMagick. |
-| **HTML → PDF** | [/tools/html-to-pdf.php](https://pqpdf.com/tools/html-to-pdf.php) | Upload `.html` / `.htm` and convert via LibreOffice. |
+| **HTML → PDF** | [/tools/html-to-pdf.php](https://pqpdf.com/tools/html-to-pdf.php) | Convert `.html` / `.htm` files or any public URL to PDF via **Playwright/Chromium**. Full Chromium rendering engine captures modern CSS, web fonts, lazy-loaded images, and JavaScript-rendered content. URL mode uses `waitUntil:'load'` + an 8 s networkidle cap (never stalls on analytics/polling), auto-scrolls to trigger IntersectionObserver lazy loading, waits for `document.fonts.ready`, flushes two `requestAnimationFrame` cycles, then emulates `@media print` before generating the PDF. Page size (A4/Letter/Legal/auto-width), orientation, and margins are configurable. |
 | **PDF → PowerPoint** | [/tools/pdf-to-ppt.php](https://pqpdf.com/tools/pdf-to-ppt.php) | Convert PDF pages to a PPTX presentation. Each page is rendered at 150 DPI via PyMuPDF and placed as a full-bleed image on its own slide using python-pptx. Slide dimensions match the original page aspect ratio. |
 | **PDF → HTML** | [/tools/pdf-to-html.php](https://pqpdf.com/tools/pdf-to-html.php) | Convert PDF pages to a styled HTML document using PyMuPDF `page.get_text("html")`, which preserves font, size, and positioned text spans. Pages are separated by CSS `page-break-after` divs. Produces a single self-contained `.html` file with print-friendly styling. |
 | **PDF → Markdown** | [/tools/pdf-to-md.php](https://pqpdf.com/tools/pdf-to-md.php) | Convert PDF to GitHub-flavoured Markdown using **pymupdf4llm** — the latest AI/LLM-optimised layout analysis engine built on PyMuPDF 1.27 + ONNX. Detects headings, paragraphs, tables, code blocks, and list structures. Produces clean `.md` ideal for RAG pipelines, LLM ingestion, and documentation workflows. |
@@ -149,6 +149,7 @@ Browser (HTTPS / HTTP3 / QUIC)
 │                    │  PyMuPDF 1.27 — edit, nup,      │   │
 │                    │    deskew, outline, a11y,       │   │
 │                    │    font-inspect, color-inspect  │   │
+│                    │  Playwright/Chromium — html→pdf │   │
 │                    │  pymupdf4llm — PDF → Markdown   │   │
 │                    │  python-pptx — PDF → PPTX       │   │
 │                    │  pdfplumber — table → JSON      │   │
@@ -187,15 +188,90 @@ All facts in this section are derived from `api.php`, `_tool_head.php`, and per-
 - Shell commands receive paths via `escapeshellarg()` — no user-controlled string ever reaches the shell unescaped.
 - `timeout CMD_TIMEOUT` (120 seconds) wraps every external command — no process runs indefinitely.
 
+### Process Isolation Sandbox
+
+Every invocation of a heavy external tool — Ghostscript, Python, LibreOffice, Playwright, ImageMagick, and others — passes through a mandatory four-layer sandbox chain before the tool's process image is loaded. The architecture is **sandbox-by-default**: new tools added to `api.php` inherit the full chain automatically; an explicit opt-out (`NOSANDBOX_TOOLS`) is required to exempt a tool.
+
+**Layer 1 — prlimit (kernel resource caps)**
+
+The outermost layer calls `prlimit` with hard limits that the kernel enforces regardless of what code runs inside:
+
+| Resource | Limit | Constant |
+|---|---|---|
+| Virtual address space (`--as`) | 1.5 GB | `RLIMIT_AS` |
+| Maximum file size (`--fsize`) | 512 MB | `RLIMIT_FSIZE` |
+| Process count (`--nproc`) | 256 processes | `RLIMIT_NPROC` |
+| Open file descriptors (`--nofile`) | 512 | `RLIMIT_NOFILE` |
+
+CPU time is **not** set via `prlimit --cpu` here. Setting `RLIMIT_CPU` combined with `unshare --pid --fork` (Layer 3) causes a kernel-level `sigprocmask` conflict where the SIGXCPU signal is delivered to the unshare stub rather than the tool process. CPU time is instead enforced by `ulimit -t` inside `pqpdf-sandbox` (Layer 4), applied after the PID namespace fork completes.
+
+**Layer 2 — aa-exec / AppArmor (mandatory access control)**
+
+`aa-exec -p pqpdf-unshare` transitions the calling process into the `pqpdf-unshare` AppArmor profile before `unshare` executes. This is required on Ubuntu 24.04+, where user namespace creation (`clone(CLONE_NEWUSER)`) is gated behind the AppArmor `userns` permission:
+
+- Profile: `/etc/apparmor.d/pqpdf-unshare` — grants `userns` + `mount` permissions needed to create namespaces and bind-mount the job directory; denies all other filesystem writes outside the sandbox scratch area.
+- A second profile (`/etc/apparmor.d/usr.local.bin.pqpdf-sandbox`) confines the setup script itself, restricting which binaries it may exec and which paths it may write.
+
+**Layer 3 — unshare (Linux namespace isolation)**
+
+`unshare` creates a set of independent Linux kernel namespaces. The tool and all its children run in a private environment isolated from the host:
+
+| Namespace flag | Effect |
+|---|---|
+| `--user --map-root-user` | New user namespace — the process believes it is root (UID 0) but holds no real capabilities outside the namespace |
+| `--net` | Private network stack with no interfaces — all `connect()` syscalls fail; the tool cannot reach the internet or internal services |
+| `--pid --fork` | Isolated PID tree; PIDs start at 1 inside the namespace; child processes cannot escape to the host PID table |
+| `--ipc` | Private shared memory and POSIX message queues; tools cannot communicate with other processes on the host via IPC |
+| `--mount` | Private mount namespace; filesystem changes (bind mounts, tmpfs) are invisible to the host |
+
+**Layer 4 — pqpdf-sandbox (filesystem isolation script)**
+
+`/usr/local/bin/pqpdf-sandbox` is a shell script that runs inside the new namespaces. It is the innermost layer:
+
+1. Mounts a 512 MB tmpfs at `/sandbox-scratch` — all scratch I/O happens on an in-memory filesystem that vanishes when the namespace exits.
+2. Bind-mounts the job directory (passed via `PQPDF_WORKDIR`) into `/sandbox-scratch/work/` — the tool sees its input and writes output there.
+3. Applies a per-process CPU time limit via `ulimit -t` — enforced inside the PID namespace where SIGXCPU is delivered correctly.
+4. `exec`s the real tool binary. No shell remains after exec; the tool is the direct child process in the namespace.
+
+**NOSANDBOX_TOOLS exemption**
+
+Four tools are exempted from the full chain (`NOSANDBOX_TOOLS = ['pdfinfo', 'qpdf', 'pdfseparate', 'pdftotext']`):
+- All four are read-only analysis tools — they never write output files that return to the user.
+- All four have minimal attack surface (no interpreter, no JIT, no scripting engine).
+- Sandboxing them would add 50–150 ms latency to lightweight info-fetch operations with no meaningful security gain.
+
+**SANDBOX_MIN_LEVEL enforcement**
+
+`SANDBOX_MIN_LEVEL = 'full'` means the server will refuse to run sandboxed tools in degraded mode — if any sandbox layer is unavailable (e.g. `aa-exec` not installed, `/usr/local/bin/pqpdf-sandbox` missing), the operation fails with an error rather than silently running unsandboxed. Degraded execution is always logged to the security event log.
+
 ### Zero Retention
 - `send_file()` calls `readfile($path)` then immediately calls `cleanup($cleanup_paths)` and `exit`.
 - The temp directory is deleted **while the download is still streaming** to the browser.
 - No file content is written to any database. No file path is logged.
 
 ### Rate Limiting
-- Session-based sliding-window counter: **10 operations per 5-minute window** (`RATE_LIMIT_MAX = 10`, `RATE_LIMIT_WINDOW = 300`).
+
+Two independent rate-limiting layers protect against abuse:
+
+**Session-based (per-browser session)**
+- Sliding-window counter: **10 operations per 5-minute window** (`RATE_LIMIT_MAX = 10`, `RATE_LIMIT_WINDOW = 300`).
 - Poll/keepalive operations (`edit-page`, `edit-ping`, `pdf-scan-poll`) are explicitly exempt to avoid blocking live progress UIs.
 - Limit exceeded returns HTTP 429 with a plain-text message — no silent fail.
+
+**IP-based (per source IP)**
+- **30 operations per IP per 5-minute window** (`IP_RATE_LIMIT_MAX = 30`) — generous enough for NAT environments where many users share one IP, but still bounds individual abusers.
+- Backed by Redis (`REDIS_HOST=127.0.0.1:6379`, namespace prefix `pqpdf:`) when available; falls back to atomic filesystem token-bucket files under `/tmp/pqpdf_rl/` when Redis is unreachable so the limit is always enforced.
+- Returns HTTP 429 when the IP bucket is exhausted.
+
+### Concurrency Limiting
+
+A counting semaphore prevents resource exhaustion under simultaneous heavy load:
+
+- **Maximum 4 concurrent heavy operations** (`MAX_CONCURRENT_JOBS = 4`) — enforced server-wide across all sessions.
+- Backed by Redis INCR/DECR atomics with a `BG_JOB_TTL = 600` second expiry (stale slots auto-release); filesystem marker files under `/tmp/pqpdf_jobs/` serve as the fallback counting mechanism.
+- Operations that are lightweight or poll-only (`edit-ping`, `edit-page`, `pdf-scan-poll`, `esign-status`, `get-info`, `fill-init`, etc.) are exempt from the semaphore.
+- When the limit is reached the server returns HTTP 503 ("Server is busy processing other requests. Please try again shortly.") and records a `concurrency_limit_reached` security event.
+- Background scan jobs are separately capped at **3 simultaneous jobs** (`MAX_BG_JOBS = 3`) with the same semaphore pattern.
 
 ### Security Event Logging
 All security-relevant events are written as **NDJSON** (newline-delimited JSON) to `/var/log/pqpdf/security.ndjson`. One event per line; each line is a complete JSON object ingestible by Elasticsearch, Loki, Datadog, Grafana, or `jq`. If the log file is not writable the entry falls back to `error_log()` so no event is silently dropped.
@@ -211,6 +287,7 @@ All security-relevant events are written as **NDJSON** (newline-delimited JSON) 
 | `total_size_exceeded` | Merge batch > 200 MB | `total_sz`, `limit`, `files` |
 | `repeated_pdf_validation_failure` | 3+ consecutive invalid PDF uploads in the same session | `fail_count`, `filename`, `size` |
 | `invalid_page_input` | Page range contains non-integer token (e.g. `abc`, `1-2-3`) | `input` (control chars stripped) |
+| `concurrency_limit_reached` | Server-wide job slot limit hit (`MAX_CONCURRENT_JOBS = 4`) | `limit` |
 
 **Every event carries a common envelope:**
 
@@ -1052,9 +1129,11 @@ PQC bundles (`.pqcpdf`) are auto-detected by file extension and routed directly 
 After upload, page 1 is rendered via PDF.js at the currently selected DPI. A preview canvas appears between the DPI selector and the pages options, showing the actual output resolution before any server processing:
 
 - Renders at the selected DPI scale (`dpi / 72` × page viewport), capped to 360 px wide for display
-- A hint line shows exact pixel dimensions: e.g. `Actual output: 1240 × 1754 px at 150 DPI`
+- A hint line shows exact pixel dimensions **and estimated file size per page**: e.g. `1240 × 1754 px per page — ~1.5 MB per page`
+- File size is estimated from pixel count × bytes/pixel: PNG uses ~0.7 bytes/pixel (lossless document content estimate); JPEG scales with the quality slider — `0.04 + (quality/100) × 0.11` bytes/pixel so a quality-85 JPEG at 1240 × 1754 px estimates ~0.16 MB/page
+- Size estimate updates immediately on file load (triggered by `updateEstimate()` after the DPI preview renders) and re-runs whenever DPI, format, or quality changes
 - Re-renders automatically when you switch DPI — no submit required
-- Shows `⚠️ very large files` warning inline at 300 DPI
+- Shows `⚠️ Very large files — processing may take longer` inline at 300 DPI
 
 ---
 
@@ -1172,8 +1251,10 @@ A 20-page document at 200 DPI takes approximately 100 seconds. The UI shows a li
 | HTTP | Apache with HTTP/2 |
 | Styling | Vanilla CSS (CSS variables, Grid, custom animations) |
 | Scripts | Vanilla ES6 JavaScript modules (`type="module"`, no framework) |
-| PDF engines | Ghostscript, Poppler, qpdf, LibreOffice, PyMuPDF, ImageMagick |
+| PDF engines | Ghostscript, Poppler, qpdf, LibreOffice, PyMuPDF, ImageMagick, Playwright/Chromium |
 | Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), strace 6.8 + unshare (⑭ sandbox), Correlation (⑮), ClamAV 1.4+ (⑯) |
+| Process sandbox | prlimit (resource caps) + AppArmor aa-exec (MAC) + unshare (Linux namespaces) + pqpdf-sandbox (tmpfs isolation) — four-layer chain on all heavy tools |
+| Cache / state | Redis 7 (concurrency semaphore, IP rate-limit buckets, background job slots) with filesystem fallback |
 | ML / AI | scikit-learn 1.8.0 (IsolationForest + RandomForest), numpy 1.26.4, joblib, psycopg2 — continuous learning (⑰) |
 | PQC crypto | `@noble/post-quantum` |
 | PDF.js | Mozilla PDF.js (page preview rendering, DPI preview, content scanning, corruption diagnostics) |
@@ -1186,9 +1267,10 @@ A 20-page document at 200 DPI takes approximately 100 seconds. The UI shows a li
 ```
 pdf/
 ├── index.php                  # Hub — tool cards, search, drag-drop, IndexedDB file transfer
-├── api.php                    # Single POST endpoint — all 45 operations
+├── api.php                    # Single POST endpoint — all 45 operations (sandbox chain, concurrency guard, IP rate limit, Redis integration)
 ├── api_config.php             # API config bootstrap — loads central server config
 ├── about.php                  # About page — all 45 tools explained, privacy model, engine architecture, security controls
+├── security-dashboard.php     # Security event telemetry dashboard — NDJSON log reader, stat aggregation, IP/op/UA top-N, heatmap, event log table with filters + CSV/JSON export; token-gated (PQPDF_DASHBOARD_TOKEN env var)
 ├── about.css                  # Styles for the about page
 ├── sitemap.php                # Dynamic XML sitemap with lastmod timestamps from filemtime()
 ├── sitemap.xml                # Static sitemap fallback
@@ -1202,8 +1284,10 @@ pdf/
 │   ├── pdf-cursor.css         # Ink trail cursor
 │   ├── pdf-enhanced.css       # Cutting-edge UI enhancements (@property, scroll-driven animations, container queries)
 │   ├── fill.css               # Fill PDF form tool styles
-│   └── scan.css               # Threat scanner styles (risk colours, engine chips, stream table, score meter)
+│   ├── scan.css               # Threat scanner styles (risk colours, engine chips, stream table, score meter)
+│   └── security-dashboard.css # Security dashboard styles (dark panel theme, heatmap, timeline SVG, top-N bars, event table)
 ├── js/
+│   ├── security-dashboard.js  # Security dashboard — stats rendering, SVG timeline chart, activity heatmap (7d×24h), top-N panels, event log table (sort/filter/paginate), CSV+JSON export, auto-refresh
 │   ├── pdf.js                 # Hub init, search, drag-drop routing
 │   ├── pdf-background.js      # Floating docs + particle animation
 │   ├── pdf-cursor.js          # Cursor ink trail
@@ -1226,7 +1310,7 @@ pdf/
 │       ├── rotate.js          # Canvas preview, odd/even/range, decimal angles
 │       ├── protect.js         # Dual-mode AES + PQC, key management
 │       ├── unlock.js          # Encryption type detection (client-side header scan), AES badge, PQC bundle routing
-│       ├── to-images.js       # Format, DPI, JPEG quality, page range, live DPI quality preview (PDF.js)
+│       ├── to-images.js       # Format, DPI, JPEG quality, page range, live DPI quality preview (PDF.js) — size estimate from pixel dimensions × bytes/pixel
 │       ├── extract-text.js    # Layout, encoding, page range
 │       ├── extract-pages.js   # Thumbnail selection, range compression
 │       ├── pdf-info.js        # Full metadata display + quick page 1 canvas preview
@@ -1347,6 +1431,7 @@ pdf/
 | **Privacy Policy** | [pqpdf.com/legal/privacy.php](https://pqpdf.com/legal/privacy.php) | Data handling, GDPR rights, zero-retention confirmation |
 | **Privacy & Security** | [pqpdf.com/legal/security.php](https://pqpdf.com/legal/security.php) | Technical security page: temp-dir lifecycle, TLS config, ML data policy |
 | **Sitemap** | [pqpdf.com/sitemap.php](https://pqpdf.com/sitemap.php) | Dynamic XML sitemap with `lastmod` timestamps derived from `filemtime()` |
+| **Security Dashboard** | `/security-dashboard.php` | Live security event telemetry — event timeline, heatmap, top IPs/ops/UAs, filterable event log table with CSV/JSON export. `noindex, nofollow`. Token-gated via `PQPDF_DASHBOARD_TOKEN` env var or `X-Dashboard-Token` header. |
 
 ---
 
