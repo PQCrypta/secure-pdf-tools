@@ -401,6 +401,35 @@ Two modes:
 
 ---
 
+## Enterprise / On-Premise
+
+**[pqpdf.com/enterprise.php](https://pqpdf.com/enterprise.php)**
+
+The full PQ PDF engine — all 45 tools, all 20 forensic engines, the four-layer sandbox, ML models, and post-quantum cryptography — packaged for deployment inside your own infrastructure.
+
+### Why On-Premise
+
+| Concern | SaaS risk | On-premise resolution |
+|---|---|---|
+| **Data sovereignty** | Files traverse third-party networks and may be retained | Files never leave your network — zero-egress architecture |
+| **Compliance** | GDPR, HIPAA, FedRAMP, ISO 27001 require data-handling controls you cannot audit in SaaS | Deploy behind your own firewall; your DPO controls every processing step |
+| **Cost at scale** | Per-page or per-seat SaaS pricing compounds with volume | One server instance; unlimited internal use at flat infrastructure cost |
+| **Security posture** | Shared multi-tenant infrastructure; you cannot verify isolation | Dedicated host; your own AppArmor profiles, SELinux policy, network rules |
+| **Air-gap environments** | SaaS requires internet egress | Fully offline-capable — no phone-home, no licence server, no CDN dependency |
+
+### What the Enterprise Page Covers
+
+- **Security architecture** — four-layer sandbox (prlimit → AppArmor → Linux namespaces → pqpdf-sandbox), zero-retention file lifecycle, NIST PQC standards (FIPS 203/204/205)
+- **Cost & ROI** — documented breach incidents with verified financial penalties (MOVEit, Change Healthcare, Anthem, Equifax, Capital One, British Airways, Morgan Stanley, and others), vs. on-premise deployment cost
+- **Threat intelligence** — current PDF attack statistics (Check Point Research 2025, HP Wolf Security 2024–2025, Kaspersky 2024, Verizon DBIR 2025), recent CVEs in CISA KEV (CVE-2023-26369, CVE-2023-21608), and the PDFSider campaign (January 2026)
+- **Compliance** — GDPR Article 83, HIPAA §164.312, CCPA, SOX, FedRAMP Ready, UK GDPR, PCI DSS
+- **Feature comparison** — public (free) tier vs. enterprise on-premise, and PQ PDF vs. SaaS competitors
+- **Deployment overview** — server requirements, four-layer sandbox, PostgreSQL persistence, Redis concurrency, ClamAV daemon, ML model retraining
+
+Contact: **contact@pqcrypta.com** with subject `Enterprise / On-Premise Deployment`.
+
+---
+
 ## Comparison
 
 Facts are derived from code (`api.php` constants, engine list, scan.php source). Competitor claims are based on their published documentation and terms of service as of early 2026.
@@ -1266,9 +1295,10 @@ A 20-page document at 200 DPI takes approximately 100 seconds. The UI shows a li
 
 ```
 pdf/
-├── index.php                  # Hub — tool cards, search, drag-drop, IndexedDB file transfer
+├── index.php                  # Hub — tool cards, search, drag-drop, IndexedDB file transfer; featured-tools carousel (5 slides: Forensics Scanner, PQC Encrypt, E-Sign, Merge, Convert)
 ├── api.php                    # Single POST endpoint — all 45 operations (sandbox chain, concurrency guard, IP rate limit, Redis integration)
 ├── api_config.php             # API config bootstrap — loads central server config
+├── enterprise.php             # Enterprise / on-premise landing page — security architecture, cost & ROI with breach data, compliance, competitor comparison, CTA; 22 cited sources
 ├── about.php                  # About page — all 45 tools explained, privacy model, engine architecture, security controls
 ├── security-dashboard.php     # Security event telemetry dashboard — NDJSON log reader, stat aggregation, IP/op/UA top-N, heatmap, event log table with filters + CSV/JSON export; token-gated (PQPDF_DASHBOARD_TOKEN env var)
 ├── about.css                  # Styles for the about page
@@ -1278,8 +1308,10 @@ pdf/
 ├── favicon.ico                # Site favicon (ICO)
 ├── favicon.svg                # Site favicon (SVG)
 ├── README.md                  # This file
+├── PREREQUISITES.md           # Server prerequisites — all required packages, Python libraries, system services, and configuration steps for a fresh deployment
 ├── css/
-│   ├── pdf.css                # Complete UI styles
+│   ├── pdf.css                # Complete UI styles (incl. homepage carousel, Forensics Scanner card crimson accent)
+│   ├── enterprise.css         # Enterprise landing page styles — 4-column pillar grid, full-width arch cards, 2-column feature grid, breach grid, CVE cards, compliance badges, responsive breakpoints
 │   ├── pdf-background.css     # Canvas container
 │   ├── pdf-cursor.css         # Ink trail cursor
 │   ├── pdf-enhanced.css       # Cutting-edge UI enhancements (@property, scroll-driven animations, container queries)
@@ -1289,6 +1321,7 @@ pdf/
 ├── js/
 │   ├── security-dashboard.js  # Security dashboard — stats rendering, SVG timeline chart, activity heatmap (7d×24h), top-N panels, event log table (sort/filter/paginate), CSV+JSON export, auto-refresh
 │   ├── pdf.js                 # Hub init, search, drag-drop routing
+│   ├── pdf-carousel.js        # Featured-tools carousel — auto-advance (6 s), touch swipe, keyboard, reduced-motion pause, ARIA live region
 │   ├── pdf-background.js      # Floating docs + particle animation
 │   ├── pdf-cursor.js          # Cursor ink trail
 │   ├── pdf-processing.js      # Global 3D processing overlay + cross-page hub-drop file delivery via IndexedDB
