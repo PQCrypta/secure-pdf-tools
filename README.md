@@ -19,7 +19,7 @@ Four specific gaps drove this project:
 Existing tools retain files for cleanup windows (1 hour, 2 hours, "as soon as possible"). The server-side `send_file()` function in this project calls `cleanup()` immediately after `readfile()` — the temp directory is deleted while the download is still in flight. There is no retention window because there is no buffer.
 
 **2. No multi-engine threat analysis for PDFs**
-PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 20 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine (IsolationForest + RandomForest on a 38-feature vector), a differential parsing engine comparing five independent parsers across 8 structural dimensions, a polyglot binary detector, and a JavaScript AST deobfuscator.
+PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 25 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine with SHAP explainability (IsolationForest + RandomForest on a 38-feature vector), a differential parsing engine comparing five independent parsers across 8 structural dimensions, a polyglot binary detector, a JavaScript AST deobfuscator, live threat intelligence (URLhaus + VirusTotal + AlienVault OTX hash lookups), PDF signature forensics (ByteRange shadow-document detection), phishing detection (credential harvesting, brand impersonation, QR codes), embedded file analysis (PE/ELF/OLE/VBA), and TLSH fuzzy-hash campaign attribution. Every indicator is mapped to a MITRE ATT&CK technique ID.
 
 **3. No post-quantum cryptography in document workflows**
 All existing tools use AES-256 at best. This project integrates 31 post-quantum algorithms (NIST-standardised ML-KEM-1024, HQC-128/192/256, FN-DSA variants, and hybrid modes) for PDF encryption, running client-side in the browser before any data is transmitted.
@@ -70,7 +70,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Forensics Scanner** | [/tools/scan.php](https://pqpdf.com/tools/scan.php) | Forensic analysis across 20 independent engines: structural integrity, 45+ byte-level signatures, stream entropy analysis, object graph traversal, URL artifact extraction, metadata provenance analysis (ExifTool EXIF/XMP), font anomaly detection, CVE pattern matching, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioural sandbox (strace + isolated Linux namespaces), correlation analysis, ClamAV signature scanning (700k+ signatures), ML Intelligence Engine (IsolationForest + RandomForest + Bayesian contextual scoring), differential parser comparison (MuPDF · Poppler · Ghostscript · qpdf · pdfminer, 8 dimensions), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, OLE and more), and JavaScript AST deobfuscation (acorn). Returns a scored forensic report with per-indicator context and sanitize options. |
+| **PDF Forensics Scanner** | [/tools/scan.php](https://pqpdf.com/tools/scan.php) | Forensic analysis across 25 independent engines: structural integrity, 45+ byte-level signatures, stream entropy analysis, object graph traversal, URL artifact extraction, metadata provenance analysis (ExifTool EXIF/XMP), font anomaly detection, CVE pattern matching, qpdf structural integrity, YARA rule matching (11 custom rules), PeePDF deep object analysis, dynamic behavioural sandbox (strace + isolated Linux namespaces), correlation analysis (45+ compound rules), ClamAV signature scanning (700k+ signatures), ML Intelligence Engine with SHAP explainability (IsolationForest + RandomForest + Bayesian contextual scoring), differential parser comparison (MuPDF · Poppler · Ghostscript · qpdf · pdfminer, 8 dimensions), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, OLE and more), JavaScript AST deobfuscation (acorn + Node.js VM sandbox), live threat intelligence (URLhaus · VirusTotal · AlienVault OTX — hash-only, no file bytes sent), PDF signature forensics (ByteRange coverage / shadow document detection), phishing detection (credential harvesting · brand impersonation · QR code decoding), embedded file analysis (pdfdetach · PE/ELF/OLE/VBA magic bytes), and TLSH fuzzy-hash campaign attribution. MITRE ATT&CK mapping on every indicator. Returns a scored forensic report with per-indicator context and sanitize options. |
 | **Protect PDF** | [/tools/protect.php](https://pqpdf.com/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/tools/unlock.php](https://pqpdf.com/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/tools/redact.php](https://pqpdf.com/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
@@ -158,6 +158,11 @@ Browser (HTTPS / HTTP3 / QUIC)
 │                    │  PeePDF, strace/unshare, acorn  │   │
 │                    │  scikit-learn (IsolationForest  │   │
 │                    │    + RandomForest) — ML (⑰)     │   │
+│                    │  shap — SHAP TreeExplainer (⑰)  │   │
+│                    │  python3-tlsh — TLSH fuzzy hash  │   │
+│                    │  zbarimg — QR decode (㉓)        │   │
+│                    │  urllib/URLhaus/VT/OTX — TI (㉑) │   │
+│                    │  pyhanko — sig forensics (㉒)    │   │
 │                    └────────────┬────────────────────┘   │
 │                                 │                        │
 │                    send_file()  ─  readfile() then       │
@@ -405,7 +410,7 @@ Two modes:
 
 **[pqpdf.com/enterprise.php](https://pqpdf.com/enterprise.php)**
 
-The full PQ PDF engine — all 45 tools, all 20 forensic engines, the four-layer sandbox, ML models, and post-quantum cryptography — packaged for deployment inside your own infrastructure.
+The full PQ PDF engine — all 45 tools, all 25 forensic engines, the four-layer sandbox, ML models with SHAP explainability, TLSH campaign attribution, live threat intelligence integration, and post-quantum cryptography — packaged for deployment inside your own infrastructure.
 
 ### Why On-Premise
 
@@ -438,13 +443,17 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 |---|---|---|---|---|---|---|
 | File retention after processing | **Deleted during download** (cleanup in send_file()) | Up to 1 hour (published policy) | Up to 1 hour | Up to 2 hours | Up to 1 hour | Up to 1 hour |
 | Account required | **No** | Yes (for most features) | No (limited) | No (limited) | No | No |
-| Threat scanning engines | **20 independent engines** incl. ML + sandbox | None | None | None | None | None |
+| Threat scanning engines | **25 independent engines** incl. ML + SHAP + sandbox + TI + MITRE ATT&CK + phishing + campaign attribution | None | None | None | None | None |
 | ML-based anomaly detection | **Yes** (IsolationForest + RandomForest, 38-feature vector, continuously retrained) | No | No | No | No | No |
 | Dynamic behavioral sandbox | **Yes** (strace + Linux namespaces, full syscall trace) | No | No | No | No | No |
 | Post-quantum encryption | **Yes** (31 algorithms via @noble/post-quantum, client-side) | No | No | No | No | No |
 | OCR engine | **Tesseract 5 LSTM** (confidence scoring, searchable PDF output, TSV word-level stats) | Adobe Sensei | Acrobat engine | Tesseract | Tesseract | Tesseract |
 | PDF edit tools | **16 annotation types** incl. sticky notes, QR code, stamps + bookmark editor | Many | Limited | Limited | Limited | Limited |
-| Transparency (engine names) | **Ghostscript, Poppler, LibreOffice, Tesseract, PyMuPDF, ExifTool, YARA, ClamAV, PeePDF, strace, acorn, scikit-learn** | Undisclosed | Undisclosed | Undisclosed | Undisclosed | Undisclosed |
+| Threat intelligence lookups | **Yes** (URLhaus + VirusTotal + AlienVault OTX — hash only, no file bytes) | No | No | No | No | No |
+| MITRE ATT&CK mapping | **Yes** (55-entry lookup, every indicator tagged) | No | No | No | No | No |
+| Phishing detection | **Yes** (Engine ㉓ — urgency phrases, brand impersonation, AcroForm credential harvesting, QR codes) | No | No | No | No | No |
+| Campaign attribution (fuzzy hash) | **Yes** (Engine ㉕ — TLSH similarity hash vs confirmed-malicious history) | No | No | No | No | No |
+| Transparency (engine names) | **Ghostscript, Poppler, LibreOffice, Tesseract, PyMuPDF, ExifTool, YARA, ClamAV, PeePDF, strace, acorn, scikit-learn, shap, tlsh, zbarimg** | Undisclosed | Undisclosed | Undisclosed | Undisclosed | Undisclosed |
 | Open-source engines only | **Yes** — every engine is named open-source software | No | No | No | No | No |
 | Max upload (free) | **50 MB / file, 200 MB total** | 100 MB (Adobe account) | 5 GB (with account) | 200 MB | 200 MB | 200 MB |
 | JavaScript AST deobfuscation | **Yes** (Engine ⑳, acorn parser) | No | No | No | No | No |
@@ -452,11 +461,11 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 
 ---
 
-## PDF Forensics Scanner — 20 Forensic Engines
+## PDF Forensics Scanner — 25 Forensic Engines
 
 [/tools/scan.php](https://pqpdf.com/tools/scan.php)
 
-15 static analysis engines, one dynamic behavioral sandbox, an ML Intelligence Engine, a differential parsing engine, a polyglot/embedded binary detector, and a JavaScript AST deobfuscation engine — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing, and every scan is persisted to PostgreSQL to continuously improve the ML models. All 20 engines run server-side in a single request. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
+15 static analysis engines, one dynamic behavioral sandbox, an ML Intelligence Engine with SHAP per-sample explanations, a differential parsing engine, a polyglot/embedded binary detector, a JavaScript AST deobfuscation engine, live threat intelligence, PDF signature forensics, phishing detection, embedded file analysis, and TLSH fuzzy-hash campaign attribution — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing, and every scan is persisted to PostgreSQL to continuously improve the ML models. All 25 engines run server-side in a single request. Every indicator is tagged with a MITRE ATT&CK technique ID. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
 
 ### How It Works
 
@@ -468,8 +477,14 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 6. Engine ⑱ runs MuPDF (`mutool`), Poppler (`pdfinfo`/`pdfdetach`), Ghostscript, qpdf, and pdfminer independently and cross-compares 8 dimensions: page count, object count, JavaScript presence, PDF version, encryption status, AcroForm presence, embedded file count, and OpenAction. Seven distinct discrepancy checks (Critical/High/Medium) flag hidden objects, shadow object trees, or deliberate parser-confusion exploits. A hard 30-second SIGALRM wraps the engine; pdfminer runs in a subprocess with `timeout 6` for guaranteed hard-kill.
 7. Engine ⑲ scans every stream (raw and decompressed) for file magic byte signatures — ZIP, Windows PE, Linux ELF, Mach-O, Java class, OLE/CFBF, RAR, 7-Zip, embedded PostScript — to detect polyglot files that embed executable droppers inside a valid PDF container.
 8. Engine ⑳ extracts JavaScript from `/JS` literals and keyword-bearing compressed streams, parses each through the Acorn AST parser, and walks the AST detecting obfuscation constructs invisible to text-pattern matching: `eval()` chains, `String.fromCharCode()` arrays (shellcode staging), `unescape()` decode pipelines, large numeric arrays (heap spray), and `new Function()` dynamic construction.
-9. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score and ML malicious-probability score.
-10. The client renders an eight-tab report: Summary, 🧠 ML (probability bar, explainable feature importance, feedback), 🔬 Parsing (differential parser comparison), 🧬 Polyglot (magic-byte + AST deobfuscation), Threats, URLs, Streams, Metadata. Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip shows each engine completing in sequence during the upload.
+9. Engine ㉑ sends only the file's SHA-256 hash (no file bytes) to URLhaus (abuse.ch), VirusTotal (70+ AV engines), and AlienVault OTX. A confirmed hash match raises a Critical indicator and auto-labels the scan as `malicious` in the training database. Suspicious C2-pattern URLs are checked against URLhaus's URL feed.
+10. Engine ㉒ analyses PDF digital signatures via pyhanko: computes ByteRange coverage (gaps = unsigned content = shadow document attack), and diffs object inventories across incremental revisions after signing to detect execution vectors added post-signing.
+11. Engine ㉓ runs phishing analysis: 30+ urgency/deception phrases, brand impersonation keywords (Microsoft, Apple, PayPal, DocuSign, etc.), AcroForm `SubmitForm` + password-field credential harvesting detection, and QR code decoding via `zbarimg` with suspicious domain scoring.
+12. Engine ㉔ uses `pdfdetach` to extract every embedded file attachment and inspects each for PE/ELF/OLE/OOXML/script magic bytes, VBA macro detection in OOXML containers, and strings extraction from executables.
+13. Engine ㉕ computes a TLSH (Trend Locality Sensitive Hash) of the full PDF — a similarity-preserving hash — and compares it against all previously scanned confirmed-malicious PDFs in the PostgreSQL database. TLSH score <30 = near-identical (same generation); <100 = same campaign family.
+14. All 55 MITRE ATT&CK technique mappings are applied across all indicators. `mitre_techniques` list added to scan result for SIEM/SOAR integration.
+15. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score, ML malicious-probability score, and MITRE ATT&CK technique list.
+16. The client renders a nine-tab report: Summary, 🧠 ML (probability bar, SHAP feature importance, feedback), 🌍 Threat Intel (URLhaus/VT/OTX results, MITRE ATT&CK chip grid, campaign attribution), 🔬 Parsing (differential parser comparison), 🧬 Polyglot (magic-byte + AST deobfuscation), Threats, URLs, Streams, Metadata. Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip with 25 chips shows each engine completing in sequence during the scan.
 
 ### Scoring
 
@@ -704,7 +719,7 @@ The only engine that actually *executes* the PDF. Renders the file through three
 
 ### Engine ⑮ — Correlation Engine
 
-Cross-references all findings from Engines ①–⑭ and scores 30+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
+Cross-references all findings from Engines ①–⑭ and ㉑–㉕ and scores 45+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
 
 **Auto-execution combinations (highest danger)**
 
@@ -783,6 +798,40 @@ Cross-references all findings from Engines ①–⑭ and scores 30+ dangerous in
 | Dynamic shellcode + JavaScript | +90 | Runtime exec memory + JS delivery vector — JS staging shellcode payload confirmed |
 | Render timeout + JavaScript | +45 | Renderer hung >20 s + embedded JS — JS infinite-loop DoS exploit |
 
+**Threat Intelligence compound patterns (Engine ㉑ → ⑮)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| TI hash confirmed malicious | +120 | Definitive hash match — the exact file is known malware |
+| TI hash confirmed + JavaScript or auto-exec | +40 | Known malware + active content — confirmed exploit delivery |
+| TI hash confirmed + live sandbox beaconing | +50 | Three independent engines agree: known malware + runtime C2 |
+
+**Phishing compound patterns (Engine ㉓ → ⑮)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Credential harvesting + brand impersonation | +70 | AcroForm SubmitForm + password field + impersonation keywords = classic phishing PDF |
+| Credential form + suspicious submission URL | +80 | Form submits credentials to a C2 endpoint — confirmed exfiltration |
+| QR code + suspicious embedded URL | +45 | QR routes victims to phishing pages while bypassing URL scanners |
+| High phishing score (≥3) + JavaScript | +40 | Urgency phrases + JS may auto-submit forms or redirect the victim |
+
+**Embedded file compound patterns (Engine ㉔ → ⑮)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Embedded executable + auto-exec trigger | +100 | Complete dropper chain: trigger drops and runs the payload |
+| Embedded executable + JavaScript | +85 | JS can call `exportDataObject()` to drop and execute the attachment |
+| OLE attachment with VBA + JavaScript | +80 | Dual payload: JS drops the OLE file, macros execute on open |
+| Embedded executable + ExifTool exploit-kit fingerprint | +90 | Professionally crafted dropper from a known attack toolkit |
+
+**Signature forensics compound patterns (Engine ㉒ → ⑮)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| ByteRange gap + JavaScript | +95 | Unsigned JS injected after signing — shadow document attack |
+| Post-signature revisions with execution content | +90 | Execution vectors added after the document was signed |
+| ByteRange gap + qpdf structural damage | +85 | Combined forgery + structural damage hides the payload from both validators and structure scanners |
+
 **Dampening:** isolated `/OpenAction` with no JavaScript, no `/Launch`, no embedded files, no heapspray, no XFA, and no RichMedia has its score reduced by 7 points — `/OpenAction` alone is common in legitimate PDFs for navigation and zoom.
 
 ### Engine ⑯ — ClamAV Signature Scanner
@@ -823,13 +872,13 @@ High-confidence signals automatically label scan records for training: ClamAV si
 
 Training cron (`*/30 * * * * python3 /var/www/html/public/pdf/ml/train.py`) retrains both models every 30 minutes. Models saved to `/pdf/ml/models/` as `.pkl` files via `joblib`. Metadata (sample counts, contamination, CV AUC) persisted to `meta.json`.
 
-**Explainable ML**
+**Explainable ML — SHAP TreeExplainer**
 
-When the RandomForest model is active, the per-scan feature importance is computed: for each of the 38 features, the model's `feature_importances_` is multiplied by the feature's presence in the current scan. Top 8 non-zero contributing features are returned as `ml_feature_importance` and rendered as a proportional bar chart in the ML panel.
+When the RandomForest model is active, per-sample SHAP values are computed via `shap.TreeExplainer` (Tree SHAP, polynomial time). For each scan, the SHAP value for each of the 38 features represents its individual contribution to the malicious probability prediction for that specific document — positive values push toward malicious, negative toward benign. Top 8 contributing features are returned as `ml_shap_explanation` with direction arrows and rendered as a signed bar chart in the ML panel. Falls back to model-level `feature_importances_` if SHAP is not installed. A human-readable explanation sentence is generated from the top features (e.g. "High risk: dynamic sandbox network beacon (+0.38), embedded JavaScript (+0.22), missing metadata (+0.11)").
 
 **Result display**
 
-The Summary tab shows a lime ML panel: malicious probability bar (0–100%), model version, contextual adjustment note, Explainable ML feature importance chart (top contributing features), and false-positive / confirm-threat feedback buttons. Feedback POSTs `scan_id` + `feedback` to `api.php?operation=pdf-scan-feedback`.
+The Summary tab shows a lime ML panel: malicious probability bar (0–100%), model version, contextual adjustment note, SHAP feature importance chart (top contributing features with signed bars and human-readable explanation text), and false-positive / confirm-threat feedback buttons. Feedback POSTs `scan_id` + `feedback` to `api.php?operation=pdf-scan-feedback`.
 
 ### Engine ⑱ — Differential Parsing Detection
 
@@ -889,9 +938,181 @@ Extracts all JavaScript from the PDF (inline `/JS` literal strings and compresse
 | Array of 150+ numeric literals | `ArrayExpression` with all-numeric `Literal` elements | High | +30 |
 | `new Function(string)` | `NewExpression` with callee `Function` | High | +35 |
 
+**Anti-sandbox pattern detection:** The AST walker also detects environment-probing patterns used by exploit payloads to detect sandbox execution: `app.platform`, `screen.width`, `app.viewerVersion`, `navigator.*`, `Date.now()` timing calls. These are scored as medium-risk anti-analysis indicators.
+
+**Node.js VM sandbox execution:** Multi-stage `eval(unescape(...))` chains that are statically opaque are executed in a sandboxed `vm.runInNewContext` environment with a 2-second timeout and no access to the Node.js `require` system. The decoded payload is captured and re-scanned for shellcode signatures. This resolves obfuscation that static AST analysis alone cannot decode.
+
 **Why AST over patterns:** Text-pattern scanners look for the string `eval`. Obfuscated payloads spell it as `e\u0076al`, `window['ev'+'al']`, or build it via `String.fromCharCode`. The AST sees the *meaning* — a `CallExpression` with a callee named `eval` — regardless of how the source was written. Up to 6 fragments are analyzed per scan; each run is capped at 60 KB.
 
 **Dependency:** `acorn` (npm, `/var/www/html/node_modules/acorn/`). Invoked as a Node.js subprocess.
+
+---
+
+### Engine ㉑ — Threat Intelligence
+
+Sends only the file's SHA-256 hash to three live threat intelligence feeds. **No file bytes ever leave the server.**
+
+**Feeds queried**
+
+| Feed | Method | What it checks |
+|---|---|---|
+| **URLhaus** (abuse.ch) | `POST /v1/payload/` with `Auth-Key` header | SHA-256 against malware payload database; URL reputation for C2-pattern URLs extracted from the PDF |
+| **VirusTotal** | `GET /api/v3/files/{sha256}` with `x-apikey` | 70+ AV engine community scores; malicious / suspicious / undetected breakdown |
+| **AlienVault OTX** | `GET /api/v1/indicators/url/{url}/general` with `X-OTX-API-KEY` | Community IOC pulse count for suspicious URLs |
+
+**Auto-labeling:** A confirmed URLhaus hash match auto-labels the PostgreSQL scan record as `malicious` (label_source = `threat_intel`), feeding directly into ML retraining.
+
+**SSL fallback:** TI requests use a verified SSL context, falling back to an unverified context if the system CA store is incomplete (common in isolated/containerised deployments).
+
+**API keys:** Configured as PHP constants in `config.php` (`THREATFOX_API_KEY` / `URLHAUS_API_KEY` for AbuseCH, `VIRUSTOTAL_API_KEY`, `ALIENVAULT_OTX_API_KEY`). Injected as environment variables (`ABUSECH_API_KEY`, `VT_API_KEY`, `OTX_API_KEY`) into the Python subprocess via `putenv()`. All three services offer free API tiers.
+
+**MITRE ATT&CK tagging:** Every TI indicator is mapped to `T1588.001` (Obtain Capabilities: Malware) and `T1588.002` (Obtain Capabilities: Tool).
+
+---
+
+### Engine ㉒ — PDF Signature Forensics
+
+Forensic analysis of PDF digital signatures using the **pyhanko** library.
+
+**ByteRange coverage analysis**
+
+A digitally signed PDF declares the byte ranges it covers in the `/ByteRange` array of the signature dictionary. If the signed byte ranges do not cover the entire file, the uncovered bytes are outside the signature's protection — any content there was appended after signing:
+
+- Computes file length vs. total ByteRange coverage
+- Gap ≥ 1 byte → `Unsigned Content Gap` indicator (High)
+- Gap containing active content (`/JavaScript`, `/Launch`, `/OpenAction`, `/EmbeddedFile`) → critical shadow document attack indicator (+95 Correlation bonus)
+- Gap size reported in bytes to aid forensic triage
+
+**Incremental revision diffing**
+
+Legitimate incremental updates (annotations, form fill-ins) are expected after signing. Malicious ones add execution vectors:
+
+- Splits the PDF at each `%%EOF` marker to isolate each incremental revision
+- Diffs object inventories before and after the signature using PyMuPDF's `xref_get_key()`
+- Objects of type `/Action`, `/JavaScript`, `/Launch`, `/OpenAction`, `/EmbeddedFile`, `/RichMedia` present in post-signature revisions but not before → `Post-Signature Execution Content Added` indicator (Critical)
+- Revision count and per-revision object delta exported to `structure.signature_forensics`
+
+---
+
+### Engine ㉓ — Phishing Detection
+
+Multi-vector phishing analysis across four detection layers.
+
+**Urgency & deception phrase detection (30+ patterns)**
+
+Scans extracted text for phrases statistically associated with social engineering: `login required`, `verify your account`, `suspended`, `unusual activity`, `confirm your identity`, `prize`, `winner`, `claim your reward`, `limited time`, `act now`, `expire`, `update your information`, `security alert`, `account locked`, `verify now`, and others. Each match increments a phishing score; score ≥3 reported as High.
+
+**Brand impersonation keywords**
+
+Matches brand names associated with phishing campaigns against extracted text and metadata: Microsoft, Office 365, OneDrive, Apple, iCloud, Amazon, PayPal, DocuSign, Adobe, DHL, FedEx, UPS, IRS, HMRC, Netflix, LinkedIn, Dropbox, Google, Chase, Bank of America, and others.
+
+**AcroForm credential harvesting**
+
+Structural analysis of PDF forms for the credential-exfiltration pattern:
+- `/SubmitForm` action present in AcroForm → flags the submission endpoint URL
+- Password-type field (`/FT /Tx` + `/TU` containing "password" / "pwd" / "pass" / "pin") → `Credential Harvesting Form` indicator (High)
+- Both present together + suspicious submission URL → Correlation Engine adds +80 bonus
+
+**QR code extraction and decoding**
+
+- Renders each PDF page to a PNG image via PyMuPDF at 150 DPI
+- Runs `zbarimg --raw` to decode all embedded QR codes
+- Decoded URLs checked for suspicious patterns: raw IP addresses, non-HTTPS schemes, URL shortener domains (`bit.ly`, `tinyurl.com`, `t.co`, etc.), domains registered <90 days (if whois available)
+- Phishing QR code reported as High; combined with suspicious embedded URLs → Correlation Engine adds +45 bonus
+
+**Dependency:** `zbarimg` (`zbar-tools` apt package, `/usr/bin/zbarimg`).
+
+---
+
+### Engine ㉔ — Embedded File Analysis
+
+Forensic analysis of every embedded file attachment extracted from the PDF.
+
+**Extraction**
+
+Uses `pdfdetach -saveall` (Poppler) to extract all `/EmbeddedFile` stream attachments to a temporary directory. Falls back to PyMuPDF `doc.embfile_get()` for each `doc.embfile_count()` attachment if pdfdetach fails.
+
+**Magic byte classification**
+
+| Magic bytes | Format | Risk | Score |
+|---|---|---|---|
+| `MZ` | Windows PE executable | Critical | +80 |
+| `\x7fELF` | Linux ELF binary | Critical | +80 |
+| `\xd0\xcf\x11\xe0` | OLE/CFBF (Office binary) | High | +45 |
+| `PK\x03\x04` + OOXML signature | Office Open XML (docx/xlsx/pptx) | Medium | +25 |
+| `.bat`, `.ps1`, `.vbs`, `.cmd`, `.sh`, `.py` extension | Script file | High | +50 |
+| `Rar!\x1a\x07` / `7z\xbc\xaf` | Compressed archive | Medium | +15 |
+
+**VBA macro detection**
+
+For OOXML attachments (ZIP containers): inspects entries `xl/vbaProject.bin`, `word/vbaProject.bin`, and `ppt/vbaProject.bin`. Presence of any `vbaProject.bin` entry confirms VBA macros — reported as High regardless of attachment type.
+
+**Strings extraction**
+
+For PE/ELF executables: extracts printable ASCII strings ≥8 chars (`strings`-style scan of raw bytes). Surfaces suspicious API names (`CreateRemoteThread`, `VirtualAlloc`, `WinExec`, `ShellExecute`, `DownloadFile`), IP address literals, and command-line arguments to aid manual triage.
+
+**Correlation:** A PDF carrying a PE executable is treated as a confirmed dropper regardless of other indicators — the Correlation Engine adds +100 when combined with any auto-execute trigger.
+
+---
+
+### Engine ㉕ — Campaign Attribution
+
+Fuzzy-hash similarity matching against the confirmed-malicious scan history.
+
+**TLSH (Trend Locality Sensitive Hash)**
+
+TLSH is a locality-sensitive hash: similar files produce similar hashes, unlike SHA-256 where a 1-bit change produces a completely different hash. It is designed specifically for malware similarity clustering.
+
+- Computed on the full PDF byte content using the `python3-tlsh` library
+- TLSH score 0 = identical; <30 = near-identical (same exploit kit generation / same campaign tooling); <100 = same malware campaign family; ≥100 = distinct samples
+- Stored in `pdf_scan_history.tlsh_hash` (indexed via `idx_psh_tlsh_hash`)
+
+**Database comparison**
+
+After computing the TLSH hash, Engine ㉕ queries the 500 most recently confirmed-malicious PDFs from PostgreSQL:
+
+```sql
+SELECT id, sha256, tlsh_hash, label
+FROM pdf_scan_history
+WHERE label = 'malicious'
+  AND tlsh_hash IS NOT NULL
+  AND tlsh_hash NOT IN ('', 'TNULL', 'T1')
+ORDER BY scan_at DESC
+LIMIT 500
+```
+
+Any match with score <100 is reported as a `Campaign Attribution Match` indicator. The matched scan's ID is included for cross-reference.
+
+**Structural fingerprint fallback**
+
+For PDFs too small for reliable TLSH (< 512 bytes), Engine ㉕ falls back to a structural fingerprint: object count, stream count, action type set, and encrypted flag. The fingerprint is stored as JSON in `structure.campaign_attribution.structural_fingerprint`.
+
+**MITRE ATT&CK:** Campaign matches are tagged `T1583` (Acquire Infrastructure) and `T1587.001` (Develop Capabilities: Malware).
+
+---
+
+### MITRE ATT&CK Mapping
+
+Every indicator produced by all 25 engines is tagged with one or more MITRE ATT&CK technique IDs via a 55-entry lookup table keyed on indicator name substrings:
+
+| Technique ID | Name | Triggered by |
+|---|---|---|
+| T1059.007 | Command and Scripting: JavaScript | JavaScript indicators, eval chains, AST findings |
+| T1203 | Exploitation for Client Execution | Heapspray, shellcode, CVE patterns, large numeric arrays |
+| T1027 | Obfuscated Files or Information | unescape(), fromCharCode, dynamic eval, new Function() |
+| T1055 | Process Injection | Anonymous exec memory (sandbox), shellcode execution |
+| T1071 | Application Layer Protocol | Network beacon, suspicious URLs |
+| T1041 | Exfiltration Over C2 Channel | Network beacon + URL match |
+| T1566.001 | Phishing: Spearphishing Attachment | Phishing indicators |
+| T1204.002 | User Execution: Malicious File | Launch actions, dropper patterns |
+| T1588.001 | Obtain Capabilities: Malware | TI hash confirmed |
+| T1497 | Virtualization/Sandbox Evasion | Anti-sandbox patterns, timing evasion |
+| T1547 | Boot or Logon Autostart | OpenAction + Launch combinations |
+| T1553.003 | Subvert Trust Controls: SIP Hijacking | Signature forgery / ByteRange gap |
+| T1036 | Masquerading | Metadata stripping, polyglot files |
+| … | (45 more entries across all engines) | — |
+
+The full `mitre_techniques` array is included in every scan result JSON for SIEM/SOAR integration.
 
 ### Report Tabs
 
@@ -899,11 +1120,12 @@ The tab bar uses a pill-style design with background highlighting on hover and a
 
 | Tab | Contents |
 |---|---|
-| **📊 Summary** | Risk banner (Clean / Low Risk / Suspicious / High Risk / Dangerous), composite score meter (0–999), 15-cell stats grid (clickable Threats/URLs/Streams cards), engines-completed pill strip, top 5 threats preview with link to full Threats tab |
+| **📊 Summary** | Risk banner (Clean / Low Risk / Suspicious / High Risk / Dangerous), composite score meter (0–999), 15-cell stats grid (clickable Threats/URLs/Streams cards), engines-completed pill strip (25 chips), top 5 threats preview with link to full Threats tab |
 | **⚠️ Threats** | All indicators grouped by risk level (Critical → High → Medium → Low), each showing badge, key, description, count, engine attribution, and byte-context snippet |
 | **🌐 URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
 | **📦 Streams** | Table of displayed streams (top 40 of N total; explains decompressed count vs skipped images/fonts). Columns: xref, type, decompressed size, Shannon entropy bar, suspicious flag, matched pattern list. Suspicious streams highlighted in amber. |
-| **🧠 ML** | ML Intelligence Engine panel: malicious probability bar, model version, contextual dampening/amplification note, Explainable ML feature importance chart, false-positive / confirm-threat feedback buttons. Tab badge shows current malicious % score. |
+| **🧠 ML** | ML Intelligence Engine panel: malicious probability bar, model version, contextual dampening/amplification note, SHAP feature importance chart (signed per-sample bars + human-readable explanation text), false-positive / confirm-threat feedback buttons. Tab badge shows current malicious % score. |
+| **🌍 Threat Intel** | URLhaus / VirusTotal / OTX hash & URL reputation results, MITRE ATT&CK technique chip grid (one chip per technique with ID + name), SHA-256 hash display, campaign attribution (TLSH hash + cluster match), confirmed-malware banner if hash matched. Tab badge shows `!` for confirmed malicious. |
 | **🔬 Parsing** | Differential Parsing Detection panel: five parser cards (MuPDF · Poppler · Ghostscript · qpdf · pdfminer), each showing pages, objects, PDF version, JavaScript, encryption, AcroForm, embedded files, linearized, OpenAction, annotations, structural integrity. Seven mismatch badge types (Critical/High/Medium) highlight parser-evasion discrepancies. |
 | **🧬 Polyglot** | Polyglot/Embedded Binary Detection panel (magic-byte hits with type and risk badge) + JavaScript AST Deobfuscation panel (obfuscation findings — dynamic eval, fromCharCode arrays, unescape calls, large numeric arrays, new Function). |
 | **🏷️ Metadata** | Document metadata KV table (title, author, subject, keywords, creator, producer, dates, format, XMP flag) + structure info KV table (version, EOF markers, xref tables, linearized, binary comment, stream counts) |
