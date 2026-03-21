@@ -915,7 +915,7 @@ After a scan, two sanitize methods are available using the session token — the
 | Method | How | Safety |
 |---|---|---|
 | **Flatten to Images** | Renders every page to 144 DPI raster images via PyMuPDF, rebuilds as a new PDF | Maximum — destroys all JavaScript, launch actions, embedded files, XFA forms, rich media, and object streams with absolute certainty. Text becomes non-searchable. |
-| **Strip Active Content** | Re-processes through Ghostscript with `-dSAFER` | Preserves searchable text and document structure. Removes JavaScript, launch actions, embedded files, and rich media. Cannot guarantee removal of zero-day or heavily obfuscated exploit structures. |
+| **Strip Active Content** | Re-processes through Ghostscript with `-dSAFER` | Moderate safety — removes JavaScript, launch actions, embedded files, and rich media. Text is usually retained but not guaranteed: documents with XFA forms, JavaScript-rendered content, or complex font encoding may lose fidelity. Cannot guarantee removal of zero-day or heavily obfuscated exploit structures. |
 
 ---
 
@@ -1308,7 +1308,17 @@ pdf/
 ├── favicon.ico                # Site favicon (ICO)
 ├── favicon.svg                # Site favicon (SVG)
 ├── README.md                  # This file
-├── PREREQUISITES.md           # Server prerequisites — all required packages, Python libraries, system services, and configuration steps for a fresh deployment
+├── USAGE.md                   # API reference and integration examples
+├── deploy/                    # Deployment and configuration scripts (self-contained — copy this dir to any server)
+│   ├── start.sh               # Full installation wizard — collects all config upfront, runs every step unattended
+│   ├── deploy.sh              # Step 1 — install all system prerequisites (apt, pip, npm, AppArmor, sandbox)
+│   ├── extract.sh             # Step 2 — unpack ui.tar.gz into web root, create runtime dirs, set permissions
+│   ├── install.sh             # Step 3 — configure application (Apache, PHP-FPM, SSL, env file, DB schema, cron)
+│   ├── setup-proxy.sh         # Step 4 — install and configure pqcrypta-proxy (PQC TLS, HTTP/3, ACME, rate limiting)
+│   ├── schema.sql             # PostgreSQL schema — pdf_scan_history table, indexes, grants
+│   ├── package.sh             # Build a versioned distributable archive of the web UI
+│   ├── ui.tar.gz              # Pre-built web UI archive — all PHP, CSS, JS, Python scripts (1.3 MB)
+│   └── PREREQUISITES.md       # Full prerequisite reference (packages, services, hardware)
 ├── css/
 │   ├── pdf.css                # Complete UI styles (incl. homepage carousel, Forensics Scanner card crimson accent)
 │   ├── enterprise.css         # Enterprise landing page styles — 4-column pillar grid, full-width arch cards, 2-column feature grid, breach grid, CVE cards, compliance badges, responsive breakpoints
