@@ -161,7 +161,7 @@ Browser (HTTPS / HTTP3 / QUIC)
 │                    │  shap — SHAP TreeExplainer (⑰)  │   │
 │                    │  python3-tlsh — TLSH fuzzy hash  │   │
 │                    │  zbarimg — QR decode (㉓)        │   │
-│                    │  urllib/URLhaus/VT/OTX — TI (㉑) │   │
+│                    │  URLhaus/Bazaar/ThreatFox — TI (㉑)│   │
 │                    │  pyhanko — sig forensics (㉒)    │   │
 │                    └────────────┬────────────────────┘   │
 │                                 │                        │
@@ -410,7 +410,7 @@ Two modes:
 
 **[pqpdf.com/enterprise.php](https://pqpdf.com/enterprise.php)**
 
-The full PQ PDF engine — all 45 tools, all 25 forensic engines, the four-layer sandbox, ML models with SHAP explainability, TLSH campaign attribution, live threat intelligence integration, and post-quantum cryptography — packaged for deployment inside your own infrastructure.
+The full PQ PDF engine — all 45 tools, all 25 forensic engines, the four-layer sandbox, ML models with SHAP explainability, TLSH campaign attribution, fully offline threat intelligence (6.4M+ local indicators — URLhaus, MalwareBazaar, ThreatFox), and post-quantum cryptography — packaged for deployment inside your own infrastructure.
 
 ### Why On-Premise
 
@@ -449,7 +449,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 | Post-quantum encryption | **Yes** (31 algorithms via @noble/post-quantum, client-side) | No | No | No | No | No |
 | OCR engine | **Tesseract 5 LSTM** (confidence scoring, searchable PDF output, TSV word-level stats) | Adobe Sensei | Acrobat engine | Tesseract | Tesseract | Tesseract |
 | PDF edit tools | **16 annotation types** incl. sticky notes, QR code, stamps + bookmark editor | Many | Limited | Limited | Limited | Limited |
-| Threat intelligence lookups | **Yes** (URLhaus + VirusTotal + AlienVault OTX — hash only, no file bytes) | No | No | No | No | No |
+| Threat intelligence lookups | **Yes** (URLhaus · MalwareBazaar · ThreatFox — 6.4M+ indicators, fully local, zero external API calls per scan) | No | No | No | No | No |
 | MITRE ATT&CK mapping | **Yes** (55-entry lookup, every indicator tagged) | No | No | No | No | No |
 | Phishing detection | **Yes** (Engine ㉓ — urgency phrases, brand impersonation, AcroForm credential harvesting, QR codes) | No | No | No | No | No |
 | Campaign attribution (fuzzy hash) | **Yes** (Engine ㉕ — TLSH similarity hash vs confirmed-malicious history) | No | No | No | No | No |
@@ -477,7 +477,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 6. Engine ⑰ runs MuPDF (`mutool`), Poppler (`pdfinfo`/`pdfdetach`), Ghostscript, qpdf, and pdfminer independently and cross-compares 8 dimensions: page count, object count, JavaScript presence, PDF version, encryption status, AcroForm presence, embedded file count, and OpenAction. Seven distinct discrepancy checks (Critical/High/Medium) flag hidden objects, shadow object trees, or deliberate parser-confusion exploits. A hard 30-second SIGALRM wraps the engine; pdfminer runs in a subprocess with `timeout 6` for guaranteed hard-kill.
 7. Engine ⑱ scans every stream (raw and decompressed) for file magic byte signatures — ZIP, Windows PE, Linux ELF, Mach-O, Java class, OLE/CFBF, RAR, 7-Zip, embedded PostScript — to detect polyglot files that embed executable droppers inside a valid PDF container.
 8. Engine ⑲ extracts JavaScript from `/JS` literals and keyword-bearing compressed streams, parses each through the Acorn AST parser, and walks the AST detecting obfuscation constructs invisible to text-pattern matching: `eval()` chains, `String.fromCharCode()` arrays (shellcode staging), `unescape()` decode pipelines, large numeric arrays (heap spray), and `new Function()` dynamic construction.
-9. Engine ⑳ sends only the file's SHA-256 hash (no file bytes) to URLhaus (abuse.ch), VirusTotal (70+ AV engines), and AlienVault OTX. A confirmed hash match raises a Critical indicator and auto-labels the scan as `malicious` in the training database. Suspicious C2-pattern URLs are checked against URLhaus's URL feed.
+9. Engine ⑳ queries four local PostgreSQL databases — no external API calls, no rate limits, sub-millisecond per scan. **URLhaus hashes** (5M+ SHA-256 malware payload hashes), **URLhaus URLs** (70K+ malicious URLs, refreshed every 30 min by cron), **MalwareBazaar** (1M+ confirmed malware samples with family labels), **ThreatFox IOCs** (176K+ hashes, URLs, and domains). A confirmed match raises a Critical indicator and auto-labels the scan as `malicious` in the training database.
 10. Engine ㉑ analyses PDF digital signatures via pyhanko: computes ByteRange coverage (gaps = unsigned content = shadow document attack), and diffs object inventories across incremental revisions after signing to detect execution vectors added post-signing.
 11. Engine ㉒ runs phishing analysis: 30+ urgency/deception phrases, brand impersonation keywords (Microsoft, Apple, PayPal, DocuSign, etc.), AcroForm `SubmitForm` + password-field credential harvesting detection, and QR code decoding via `zbarimg` with suspicious domain scoring.
 12. Engine ㉓ uses `pdfdetach` to extract every embedded file attachment and inspects each for PE/ELF/OLE/OOXML/script magic bytes, VBA macro detection in OOXML containers, and strings extraction from executables.
@@ -950,21 +950,20 @@ Extracts all JavaScript from the PDF (inline `/JS` literal strings and compresse
 
 ### Engine ㉑ — Threat Intelligence
 
-Sends only the file's SHA-256 hash to three live threat intelligence feeds. **No file bytes ever leave the server.**
+Queries four local PostgreSQL tables — **zero external API calls per scan**, no rate limits, sub-millisecond lookups. All databases are downloaded in bulk and kept current by `tools/update_ti_feeds.py` running on cron.
 
-**Feeds queried**
+**Local databases**
 
-| Feed | Method | What it checks |
-|---|---|---|
-| **URLhaus** (abuse.ch) | `POST /v1/payload/` with `Auth-Key` header | SHA-256 against malware payload database; URL reputation for C2-pattern URLs extracted from the PDF |
-| **VirusTotal** | `GET /api/v3/files/{sha256}` with `x-apikey` | 70+ AV engine community scores; malicious / suspicious / undetected breakdown |
-| **AlienVault OTX** | `GET /api/v1/indicators/url/{url}/general` with `X-OTX-API-KEY` | Community IOC pulse count for suspicious URLs |
+| Database | Records | Cron schedule | What it detects |
+|---|---|---|---|
+| **URLhaus hashes** | 5,086,836 SHA-256 hashes | Weekly (Sun 3am) | Known malware payload hashes |
+| **URLhaus URLs** | 70,536 malicious URLs | Every 30 min | Active malware download / C2 URLs |
+| **MalwareBazaar** | 1,062,513 samples | Daily (2:30am) | Confirmed malware samples with family labels (Mirai, LummaStealer, Vidar, etc.) |
+| **ThreatFox IOCs** | 176,744 IOCs | Daily (2am) | Hashes, URLs, domains, IPs with malware family attribution |
 
-**Auto-labeling:** A confirmed URLhaus hash match auto-labels the PostgreSQL scan record as `malicious` (label_source = `threat_intel`), feeding directly into ML retraining.
+**Auto-labeling:** A confirmed hash match auto-labels the PostgreSQL scan record as `malicious` (label_source = `threat_intel`), feeding directly into ML retraining.
 
-**SSL fallback:** TI requests use a verified SSL context, falling back to an unverified context if the system CA store is incomplete (common in isolated/containerised deployments).
-
-**API keys:** Configured as PHP constants in `config.php` (`THREATFOX_API_KEY` / `URLHAUS_API_KEY` for AbuseCH, `VIRUSTOTAL_API_KEY`, `ALIENVAULT_OTX_API_KEY`). Injected as environment variables (`ABUSECH_API_KEY`, `VT_API_KEY`, `OTX_API_KEY`) into the Python subprocess via `putenv()`. All three services offer free API tiers.
+**Cron download script:** `tools/update_ti_feeds.py` — uses the AbuseCH API key only for bulk downloads, not per-scan calls. Each feed is a full ZIP download; records are upserted into PostgreSQL with `ON CONFLICT DO UPDATE`.
 
 **MITRE ATT&CK tagging:** Every TI indicator is mapped to `T1588.001` (Obtain Capabilities: Malware) and `T1588.002` (Obtain Capabilities: Tool).
 
@@ -1125,7 +1124,7 @@ The tab bar uses a pill-style design with background highlighting on hover and a
 | **🌐 URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
 | **📦 Streams** | Table of displayed streams (top 40 of N total; explains decompressed count vs skipped images/fonts). Columns: xref, type, decompressed size, Shannon entropy bar, suspicious flag, matched pattern list. Suspicious streams highlighted in amber. |
 | **🧠 ML** | ML Intelligence Engine panel: malicious probability bar, model version, contextual dampening/amplification note, SHAP feature importance chart (signed per-sample bars + human-readable explanation text), false-positive / confirm-threat feedback buttons. Tab badge shows current malicious % score. |
-| **🌍 Threat Intel** | URLhaus / VirusTotal / OTX hash & URL reputation results, MITRE ATT&CK technique chip grid (one chip per technique with ID + name), SHA-256 hash display, campaign attribution (TLSH hash + cluster match), confirmed-malware banner if hash matched. Tab badge shows `!` for confirmed malicious. |
+| **🌍 Threat Intel** | Local TI database results (URLhaus Hash / MalwareBazaar / ThreatFox IOC — Clean or MATCH with family label), MITRE ATT&CK technique chip grid (one chip per technique with ID + name), SHA-256 hash display, campaign attribution (TLSH hash + cluster match), confirmed-malware banner if hash matched. Tab badge shows `!` for confirmed malicious. |
 | **🔬 Parsing** | Differential Parsing Detection panel: five parser cards (MuPDF · Poppler · Ghostscript · qpdf · pdfminer), each showing pages, objects, PDF version, JavaScript, encryption, AcroForm, embedded files, linearized, OpenAction, annotations, structural integrity. Seven mismatch badge types (Critical/High/Medium) highlight parser-evasion discrepancies. |
 | **🧬 Polyglot** | Polyglot/Embedded Binary Detection panel (magic-byte hits with type and risk badge) + JavaScript AST Deobfuscation panel (obfuscation findings — dynamic eval, fromCharCode arrays, unescape calls, large numeric arrays, new Function). |
 | **🏷️ Metadata** | Document metadata KV table (title, author, subject, keywords, creator, producer, dates, format, XMP flag) + structure info KV table (version, EOF markers, xref tables, linearized, binary comment, stream counts) |
@@ -1503,7 +1502,7 @@ A 20-page document at 200 DPI takes approximately 100 seconds. The UI shows a li
 | Styling | Vanilla CSS (CSS variables, Grid, custom animations) |
 | Scripts | Vanilla ES6 JavaScript modules (`type="module"`, no framework) |
 | PDF engines | Ghostscript, Poppler, qpdf, LibreOffice, PyMuPDF, ImageMagick, Playwright/Chromium |
-| Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), strace 6.8 + unshare (⑭ sandbox), ClamAV 1.4+ (⑮), Correlation (㉕) |
+| Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), strace 6.8 + unshare (⑭ sandbox), ClamAV 1.4+ (⑮), Correlation (㉕), local TI databases: URLhaus 5M+ hashes, MalwareBazaar 1M+ samples, ThreatFox 176K+ IOCs (⑳) |
 | Process sandbox | prlimit (resource caps) + AppArmor aa-exec (MAC) + unshare (Linux namespaces) + pqpdf-sandbox (tmpfs isolation) — four-layer chain on all heavy tools |
 | Cache / state | Redis 7 (concurrency semaphore, IP rate-limit buckets, background job slots) with filesystem fallback |
 | ML / AI | scikit-learn 1.8.0 (IsolationForest + RandomForest), numpy 1.26.4, joblib, psycopg2 — continuous learning (⑯) |
@@ -1883,8 +1882,8 @@ No. Every operation — including OCR, threat scanning, format conversion, and M
 **Q: How is data in transit protected?**
 All connections are served over TLS 1.2/1.3 via Apache with HSTS (`max-age=31536000; includeSubDomains; preload`). HTTP connections are upgraded by the `upgrade-insecure-requests` CSP directive. Certificate pinning is not enforced at the application layer; browsers rely on standard CA chain validation.
 
-**Q: Does the PDF forensics scanner send files to VirusTotal or any external scanner?**
-No. All 25 forensic engines run locally: PyMuPDF, ExifTool, qpdf, YARA, PeePDF, ClamAV, the scikit-learn ML models, and the dynamic sandbox (`strace` + `unshare` Linux namespaces) all execute on the same server. No bytes leave the server during a forensic analysis.
+**Q: Does the PDF forensics scanner send files or hashes to VirusTotal or any external service?**
+No. All 25 forensic engines run entirely locally — including the Threat Intelligence engine (㉑), which queries local PostgreSQL databases rather than making external API calls. URLhaus, MalwareBazaar, and ThreatFox data is downloaded in bulk by a cron job and stored on-server; no data leaves the server during a scan. PyMuPDF, ExifTool, qpdf, YARA, PeePDF, ClamAV, the scikit-learn ML models, and the dynamic sandbox (`strace` + `unshare` Linux namespaces) all execute on the same server.
 
 **Q: What data does the ML engine store?**
 Engine ⑯ writes a 38-feature vector (structural heuristics, entropy scores, indicator counts) derived from each scan to PostgreSQL. **No file content, file name, IP address, or user identifier is stored.** The feature vector contains only numeric measurements extracted from the PDF structure. Stored records are used exclusively to retrain the IsolationForest and RandomForest models every 30 minutes. Users can submit a feedback label (malicious / benign) via the scan report UI; this label is appended to the existing feature row, not stored separately.
