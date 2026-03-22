@@ -457,7 +457,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 | Open-source engines only | **Yes** — every engine is named open-source software | No | No | No | No | No |
 | Max upload (free) | **50 MB / file, 200 MB total** | 100 MB (Adobe account) | 5 GB (with account) | 200 MB | 200 MB | 200 MB |
 | JavaScript AST deobfuscation | **Yes** (Engine ⑳, acorn parser) | No | No | No | No | No |
-| Differential parsing (5 parsers, 8 dimensions) | **Yes** (Engine ⑱) | No | No | No | No | No |
+| Differential parsing (5 parsers, 8 dimensions) | **Yes** (Engine ⑰) | No | No | No | No | No |
 
 ---
 
@@ -472,16 +472,17 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 1. The PDF is uploaded and saved to an isolated temporary directory. A session token is returned for optional sanitize follow-up.
 2. A Python script runs all 13 static heuristic engines (including ExifTool, qpdf, YARA, and PeePDF) against the raw bytes and parsed object graph via PyMuPDF.
 3. Engine ⑭ renders the PDF through Ghostscript, MuPDF, and Poppler inside isolated Linux namespaces (`unshare --net --pid --mount`) with all syscalls captured by `strace`. Detects runtime behavior invisible to static analysis.
-4. Engine ⑯ calls the local ClamAV daemon (`clamdscan --fdpass`) in the same request, falling back to `clamscan` if the daemon returns an error.
-5. Engine ⑰ extracts a 38-feature vector from all preceding engine outputs, applies Bayesian contextual scoring, runs IsolationForest anomaly detection (unsupervised — works from scan 1), and RandomForest classification (activates at ≥50 labeled samples). Reports per-scan feature importance (Explainable ML). Scan features, scores, and auto-inferred labels are persisted to PostgreSQL. Training runs every 30 minutes via cron.
-6. Engine ⑱ runs MuPDF (`mutool`), Poppler (`pdfinfo`/`pdfdetach`), Ghostscript, qpdf, and pdfminer independently and cross-compares 8 dimensions: page count, object count, JavaScript presence, PDF version, encryption status, AcroForm presence, embedded file count, and OpenAction. Seven distinct discrepancy checks (Critical/High/Medium) flag hidden objects, shadow object trees, or deliberate parser-confusion exploits. A hard 30-second SIGALRM wraps the engine; pdfminer runs in a subprocess with `timeout 6` for guaranteed hard-kill.
-7. Engine ⑲ scans every stream (raw and decompressed) for file magic byte signatures — ZIP, Windows PE, Linux ELF, Mach-O, Java class, OLE/CFBF, RAR, 7-Zip, embedded PostScript — to detect polyglot files that embed executable droppers inside a valid PDF container.
-8. Engine ⑳ extracts JavaScript from `/JS` literals and keyword-bearing compressed streams, parses each through the Acorn AST parser, and walks the AST detecting obfuscation constructs invisible to text-pattern matching: `eval()` chains, `String.fromCharCode()` arrays (shellcode staging), `unescape()` decode pipelines, large numeric arrays (heap spray), and `new Function()` dynamic construction.
-9. Engine ㉑ sends only the file's SHA-256 hash (no file bytes) to URLhaus (abuse.ch), VirusTotal (70+ AV engines), and AlienVault OTX. A confirmed hash match raises a Critical indicator and auto-labels the scan as `malicious` in the training database. Suspicious C2-pattern URLs are checked against URLhaus's URL feed.
-10. Engine ㉒ analyses PDF digital signatures via pyhanko: computes ByteRange coverage (gaps = unsigned content = shadow document attack), and diffs object inventories across incremental revisions after signing to detect execution vectors added post-signing.
-11. Engine ㉓ runs phishing analysis: 30+ urgency/deception phrases, brand impersonation keywords (Microsoft, Apple, PayPal, DocuSign, etc.), AcroForm `SubmitForm` + password-field credential harvesting detection, and QR code decoding via `zbarimg` with suspicious domain scoring.
-12. Engine ㉔ uses `pdfdetach` to extract every embedded file attachment and inspects each for PE/ELF/OLE/OOXML/script magic bytes, VBA macro detection in OOXML containers, and strings extraction from executables.
-13. Engine ㉕ computes a TLSH (Trend Locality Sensitive Hash) of the full PDF — a similarity-preserving hash — and compares it against all previously scanned confirmed-malicious PDFs in the PostgreSQL database. TLSH score <30 = near-identical (same generation); <100 = same campaign family.
+4. Engine ⑮ calls `clamdscan --no-summary` against the PDF. The `clamav` user is a member of the `www-data` group so the clamd daemon reads upload files directly — no `--fdpass` needed, no slow single-process fallback (~20 ms per scan).
+5. Engine ⑯ extracts a 38-feature vector from all preceding engine outputs, applies Bayesian contextual scoring, runs IsolationForest anomaly detection (unsupervised — works from scan 1), and RandomForest classification (activates at ≥50 labeled samples). Reports per-scan feature importance (Explainable ML). Scan features, scores, and auto-inferred labels are persisted to PostgreSQL. Training runs every 30 minutes via cron.
+6. Engine ⑰ runs MuPDF (`mutool`), Poppler (`pdfinfo`/`pdfdetach`), Ghostscript, qpdf, and pdfminer independently and cross-compares 8 dimensions: page count, object count, JavaScript presence, PDF version, encryption status, AcroForm presence, embedded file count, and OpenAction. Seven distinct discrepancy checks (Critical/High/Medium) flag hidden objects, shadow object trees, or deliberate parser-confusion exploits. A hard 30-second SIGALRM wraps the engine; pdfminer runs in a subprocess with `timeout 6` for guaranteed hard-kill.
+7. Engine ⑱ scans every stream (raw and decompressed) for file magic byte signatures — ZIP, Windows PE, Linux ELF, Mach-O, Java class, OLE/CFBF, RAR, 7-Zip, embedded PostScript — to detect polyglot files that embed executable droppers inside a valid PDF container.
+8. Engine ⑲ extracts JavaScript from `/JS` literals and keyword-bearing compressed streams, parses each through the Acorn AST parser, and walks the AST detecting obfuscation constructs invisible to text-pattern matching: `eval()` chains, `String.fromCharCode()` arrays (shellcode staging), `unescape()` decode pipelines, large numeric arrays (heap spray), and `new Function()` dynamic construction.
+9. Engine ⑳ sends only the file's SHA-256 hash (no file bytes) to URLhaus (abuse.ch), VirusTotal (70+ AV engines), and AlienVault OTX. A confirmed hash match raises a Critical indicator and auto-labels the scan as `malicious` in the training database. Suspicious C2-pattern URLs are checked against URLhaus's URL feed.
+10. Engine ㉑ analyses PDF digital signatures via pyhanko: computes ByteRange coverage (gaps = unsigned content = shadow document attack), and diffs object inventories across incremental revisions after signing to detect execution vectors added post-signing.
+11. Engine ㉒ runs phishing analysis: 30+ urgency/deception phrases, brand impersonation keywords (Microsoft, Apple, PayPal, DocuSign, etc.), AcroForm `SubmitForm` + password-field credential harvesting detection, and QR code decoding via `zbarimg` with suspicious domain scoring.
+12. Engine ㉓ uses `pdfdetach` to extract every embedded file attachment and inspects each for PE/ELF/OLE/OOXML/script magic bytes, VBA macro detection in OOXML containers, and strings extraction from executables.
+13. Engine ㉔ computes a TLSH (Trend Locality Sensitive Hash) of the full PDF — a similarity-preserving hash — and compares it against all previously scanned confirmed-malicious PDFs in the PostgreSQL database. TLSH score <30 = near-identical (same generation); <100 = same campaign family.
+14. Engine ㉕ examines combinations of findings from all preceding engines and adds weighted bonus points (35–100) for dangerous combinations (e.g. JavaScript + `/OpenAction` + high entropy = +100). Final score capped at 999.
 14. All 55 MITRE ATT&CK technique mappings are applied across all indicators. `mitre_techniques` list added to scan result for SIEM/SOAR integration.
 15. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score, ML malicious-probability score, and MITRE ATT&CK technique list.
 16. The client renders a nine-tab report: Summary, 🧠 ML (probability bar, SHAP feature importance, feedback), 🌍 Threat Intel (URLhaus/VT/OTX results, MITRE ATT&CK chip grid, campaign attribution), 🔬 Parsing (differential parser comparison), 🧬 Polyglot (magic-byte + AST deobfuscation), Threats, URLs, Streams, Metadata. Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip with 25 chips shows each engine completing in sequence during the scan.
@@ -497,7 +498,7 @@ Each indicator contributes base points multiplied by `min(count, 3)`:
 | Medium | 10 |
 | Low | 3 |
 
-The Correlation Engine (⑮) adds weighted bonus points (35–100) on top for dangerous indicator combinations. Final score is capped at 999.
+The Correlation Engine (㉕) adds weighted bonus points (35–100) on top for dangerous indicator combinations. Final score is capped at 999.
 
 | Score | Risk Level |
 |---|---|
@@ -636,7 +637,7 @@ Runs `exiftool -PDF:all -XMP:all` to extract metadata layers that are invisible 
 - **XFA confirmation** — independently verifies `HasXFA` from EXIF metadata (cross-check against Engine ④)
 - **Embedded attachment detection** — surfaces `EmbeddedFileSize` / `EmbeddedFile` fields visible only via EXIF layer
 - **Summary export** — Creator, Producer, CreateDate, ModifyDate, PDFVersion, Linearized, PageCount, HasXFA, and Encryption exported to the structure dictionary for the Metadata tab
-- **Feeds Correlation Engine** — sets `exiftool_exploit_found` flag used by Engine ⑮ for compound scoring
+- **Feeds Correlation Engine** — sets `exiftool_exploit_found` flag used by Engine ㉕ for compound scoring
 
 ### Engine ⑪ — qpdf Structural Integrity
 
@@ -647,7 +648,7 @@ Runs `qpdf --check` to validate cross-reference tables, trailer dictionaries, an
 - **Structural errors** — other qpdf errors flagged as Medium risk (up to 3× count multiplier)
 - **Structural warnings** — minor anomalies flagged as Low risk
 - **Status export** — `qpdf_status` (ok / warnings / errors / damaged) exported to structure dictionary
-- **Feeds Correlation Engine** — sets `qpdf_damaged` flag used by Engine ⑮ for compound scoring
+- **Feeds Correlation Engine** — sets `qpdf_damaged` flag used by Engine ㉕ for compound scoring
 
 ### Engine ⑫ — YARA Rule Engine
 
@@ -668,7 +669,7 @@ Compiles and matches 11 custom YARA rules targeting PDF-specific attack byte pat
 | `PDF_Encoder_Chain` | Any 3 of `/ASCII85Decode`, `/ASCIIHexDecode`, `/RunLengthDecode`, `/LZWDecode` |
 
 - **Byte-level independence** — YARA scans raw file bytes, bypassing PDF parser layers entirely; catches patterns hidden in object streams
-- **Feeds Correlation Engine** — populates `yara_hits` set used by Engine ⑮ for compound scoring
+- **Feeds Correlation Engine** — populates `yara_hits` set used by Engine ㉕ for compound scoring
 
 ### Engine ⑬ — PeePDF Deep Analysis
 
@@ -677,9 +678,9 @@ Parses the full PDF object tree using the PeePDF framework — an entirely indep
 - **Vulnerability patterns** — PeePDF's built-in vulnerability detector flags known CVE pattern combinations; each confirmed pattern reported as Critical
 - **Suspicious element location** — reports exact object IDs for dangerous elements from both `Suspicious elements` and `Dangerous elements` dictionaries: `/Launch`, `getIcon()`, `printf()`, `unescape()`, `exportDataObject()`, `submitForm()`, `/EmbeddedFile`, `/JS`, `/JavaScript`, `eval()`, `/OpenAction`, `/AA`, `/XFA`, `/URI`
 - **JavaScript object inventory** — lists all PDF object IDs containing JavaScript
-- **Independent verification** — cross-checks PyMuPDF-based findings; if both parsers flag the same element, the compound risk in Engine ⑮ is elevated
+- **Independent verification** — cross-checks PyMuPDF-based findings; if both parsers flag the same element, the compound risk in Engine ㉕ is elevated
 - **Summary export** — PDF version, object count, stream count, and vulnerability count exported to structure dictionary
-- **Feeds Correlation Engine** — sets `peepdf_vuln_count` used by Engine ⑮ for compound scoring
+- **Feeds Correlation Engine** — sets `peepdf_vuln_count` used by Engine ㉕ for compound scoring
 
 ### Engine ⑭ — Dynamic Behavioral Sandbox
 
@@ -715,11 +716,11 @@ The only engine that actually *executes* the PDF. Renders the file through three
 | **Render timeout** | Renderer exceeds 20-second execution limit | High (+35) |
 
 - **Network isolation guarantee** — in a network namespace with no interfaces, any `connect()` is definitively malicious. There is no legitimate reason for a PDF renderer to initiate a network connection.
-- **Feeds Correlation Engine** — sets `sandbox_network_attempts`, `sandbox_mmap_exec_anon`, `sandbox_exec_attempts`, `sandbox_behavioral_score` flags used by Engine ⑮ for compound scoring
+- **Feeds Correlation Engine** — sets `sandbox_network_attempts`, `sandbox_mmap_exec_anon`, `sandbox_exec_attempts`, `sandbox_behavioral_score` flags used by Engine ㉕ for compound scoring
 
-### Engine ⑮ — Correlation Engine
+### Engine ㉕ — Correlation Engine
 
-Cross-references all findings from Engines ①–⑭ and ㉑–㉕ and scores 45+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
+Cross-references all findings from Engines ①–㉔ and scores 45+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
 
 **Auto-execution combinations (highest danger)**
 
@@ -834,19 +835,18 @@ Cross-references all findings from Engines ①–⑭ and ㉑–㉕ and scores 45
 
 **Dampening:** isolated `/OpenAction` with no JavaScript, no `/Launch`, no embedded files, no heapspray, no XFA, and no RichMedia has its score reduced by 7 points — `/OpenAction` alone is common in legitimate PDFs for navigation and zoom.
 
-### Engine ⑯ — ClamAV Signature Scanner
+### Engine ⑮ — ClamAV Signature Scanner
 
 Runs the local ClamAV daemon against the PDF and reports any signature matches:
 
 - **Database** — 700,000+ signatures updated daily via `freshclam`, including the full `Pdf.Exploit.*` family (`Pdf.Exploit.CVE_2009_0927`, `Pdf.Exploit.CVE_2009_4324`, `Exploit.PDF-JS.*`, and many more)
-- **Method** — calls `clamdscan --no-summary --fdpass <path>` to pass the open file descriptor directly to the `clamd` daemon, avoiding filesystem permission issues and reusing the already-loaded in-memory signature database for speed (~50–200 ms per scan)
-- **Fallback** — if the daemon returns an error (exit code 2), falls back automatically to `clamscan` (in-process load, ~2–5 s)
+- **Method** — calls `clamdscan --no-summary <path>` directly; the `clamav` user is a member of the `www-data` group so the clamd daemon reads upload files without needing `--fdpass`, reusing the in-memory signature database (~20 ms per scan)
 - **Results** — exit code 0 = clean (engine recorded in `engines_run`, no indicator added); exit code 1 = match found, signature name extracted from output and reported as Critical; exit code 2 = scanner error, recorded in `structure.clamav_error`
-- **Distinction** — Engines ①–⑮ use heuristics, structural analysis, and dynamic execution to catch zero-days and novel exploits; Engine ⑯ provides authoritative signature intelligence for confirmed known threats. A ClamAV match auto-labels the scan record as `malicious` in the ML training database.
+- **Distinction** — Engines ①–⑭ use heuristics, structural analysis, and dynamic execution to catch zero-days and novel exploits; Engine ⑮ provides authoritative signature intelligence for confirmed known threats. A ClamAV match auto-labels the scan record as `malicious` in the ML training database.
 
-### Engine ⑰ — ML Intelligence Engine
+### Engine ⑯ — ML Intelligence Engine
 
-Extracts a 38-feature vector from all 16 preceding engine outputs and applies a three-layer ML scoring pipeline:
+Extracts a 38-feature vector from all 15 preceding engine outputs and applies a three-layer ML scoring pipeline:
 
 **Features extracted (38 total)**
 
@@ -1503,10 +1503,10 @@ A 20-page document at 200 DPI takes approximately 100 seconds. The UI shows a li
 | Styling | Vanilla CSS (CSS variables, Grid, custom animations) |
 | Scripts | Vanilla ES6 JavaScript modules (`type="module"`, no framework) |
 | PDF engines | Ghostscript, Poppler, qpdf, LibreOffice, PyMuPDF, ImageMagick, Playwright/Chromium |
-| Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), strace 6.8 + unshare (⑭ sandbox), Correlation (⑮), ClamAV 1.4+ (⑯) |
+| Threat scanning | PyMuPDF (heuristic engines ①–⑨), ExifTool 12 (⑩), qpdf 11.9 (⑪), YARA 4.5 (⑫), PeePDF 0.4 (⑬), strace 6.8 + unshare (⑭ sandbox), ClamAV 1.4+ (⑮), Correlation (㉕) |
 | Process sandbox | prlimit (resource caps) + AppArmor aa-exec (MAC) + unshare (Linux namespaces) + pqpdf-sandbox (tmpfs isolation) — four-layer chain on all heavy tools |
 | Cache / state | Redis 7 (concurrency semaphore, IP rate-limit buckets, background job slots) with filesystem fallback |
-| ML / AI | scikit-learn 1.8.0 (IsolationForest + RandomForest), numpy 1.26.4, joblib, psycopg2 — continuous learning (⑰) |
+| ML / AI | scikit-learn 1.8.0 (IsolationForest + RandomForest), numpy 1.26.4, joblib, psycopg2 — continuous learning (⑯) |
 | PQC crypto | `@noble/post-quantum` |
 | PDF.js | Mozilla PDF.js (page preview rendering, DPI preview, content scanning, corruption diagnostics) |
 | Colour theme | Amber `#ff8c00` + gold `#ffd700` on deep navy `#040810` |
@@ -1623,7 +1623,7 @@ pdf/
 │   ├── color_inspect.py       # Colour inspection (spot colours, ICC profiles, overprint)
 │   ├── table_json.py          # Table → JSON extraction (PyMuPDF find_tables)
 │   └── url_to_pdf.cjs         # URL-to-PDF conversion helper (Node.js)
-├── ml/                        # ML Intelligence Engine (Engine ⑰)
+├── ml/                        # ML Intelligence Engine (Engine ⑯)
 │   ├── train.py               # Training script — IsolationForest + RandomForest, runs every 30 min via cron
 │   └── models/                # Trained model artefacts (git-ignored)
 │       ├── isolation_forest.pkl   # Unsupervised anomaly model
@@ -1884,10 +1884,10 @@ No. Every operation — including OCR, threat scanning, format conversion, and M
 All connections are served over TLS 1.2/1.3 via Apache with HSTS (`max-age=31536000; includeSubDomains; preload`). HTTP connections are upgraded by the `upgrade-insecure-requests` CSP directive. Certificate pinning is not enforced at the application layer; browsers rely on standard CA chain validation.
 
 **Q: Does the PDF forensics scanner send files to VirusTotal or any external scanner?**
-No. All 20 forensic engines run locally: PyMuPDF, ExifTool, qpdf, YARA, PeePDF, ClamAV, the scikit-learn ML models, and the dynamic sandbox (`strace` + `unshare` Linux namespaces) all execute on the same server. No bytes leave the server during a forensic analysis.
+No. All 25 forensic engines run locally: PyMuPDF, ExifTool, qpdf, YARA, PeePDF, ClamAV, the scikit-learn ML models, and the dynamic sandbox (`strace` + `unshare` Linux namespaces) all execute on the same server. No bytes leave the server during a forensic analysis.
 
 **Q: What data does the ML engine store?**
-Engine ⑰ writes a 38-feature vector (structural heuristics, entropy scores, indicator counts) derived from each scan to PostgreSQL. **No file content, file name, IP address, or user identifier is stored.** The feature vector contains only numeric measurements extracted from the PDF structure. Stored records are used exclusively to retrain the IsolationForest and RandomForest models every 30 minutes. Users can submit a feedback label (malicious / benign) via the scan report UI; this label is appended to the existing feature row, not stored separately.
+Engine ⑯ writes a 38-feature vector (structural heuristics, entropy scores, indicator counts) derived from each scan to PostgreSQL. **No file content, file name, IP address, or user identifier is stored.** The feature vector contains only numeric measurements extracted from the PDF structure. Stored records are used exclusively to retrain the IsolationForest and RandomForest models every 30 minutes. Users can submit a feedback label (malicious / benign) via the scan report UI; this label is appended to the existing feature row, not stored separately.
 
 **Q: Is the service GDPR-compliant?**
 Files are never retained (zero-retention guarantee above). The only personal data processed is the IP address in Apache access logs, which are subject to standard server log rotation. No file content, metadata, or user-identifying information is stored in any application database. See the [Privacy Policy](https://pqpdf.com/legal/privacy.php) for full GDPR rights.
