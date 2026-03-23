@@ -2162,7 +2162,7 @@ curl -X POST https://pqpdf.com/api.php \
   -b cookies.txt
 ```
 
-Returns `{ "status": "running" }` while the 20 engines execute, then the full threat report JSON once complete. Poll every 2 seconds until `status` is `done` or `error`.
+Returns `{ "status": "running" }` while the 44 engines execute, then the full threat report JSON once complete. Poll every 2 seconds until `status` is `done` or `error`.
 
 **Threat report envelope:**
 ```json
