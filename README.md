@@ -461,13 +461,13 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 
 ---
 
-## PDF Forensics Scanner — 25 Forensic Engines
+## PDF Forensics Scanner — 44 Forensic Engines
 
 [/tools/scan.php](https://pqpdf.com/tools/scan.php)
 
 **44 forensic engines** — the most comprehensive free PDF threat analysis available, including techniques absent from every commercial static scanner:
 
-**New engines (32–43):** XFA FormCalc Script Extractor (the only static tool that parses FormCalc — exec/openURL/submit exfiltration/initialize auto-execute) · PDF Action Dependency Graph (directed graph of all actions — cycles, deep chains, fan-in maximization, dead sleeper nodes) · OCG Layer Cloaking (hidden optional content groups with never-visible and screen/print divergence detection) · Unicode & Invisible Text (rendering mode 3/7 invisible text, RLO override attacks U+202E, homograph domains) · Trailer Chain Forensics (raw /Prev chain walk — ID mutation, /Root swap Shadow Attack, encryption changes) · Codec Exploit Parameter Validation (CCITTFax OOB, JBIG2Globals CVE-2009-0658, DCT mismatch, LZW EarlyChange, multi-filter chains) · Physical Entropy Topology (PDF-structure-aware sliding-window entropy — post-EOF data, entropy cliffs) · Image Steganography (LSB chi-square test, tracking beacons, JPEG EXIF anomalies) · PDF/A Compliance Fraud Detection (false archival claims bypass DLP) · JavaScript Behavioral Emulation (Node.js vm + full Acrobat API stub — captures LAUNCH_URL, SUBMIT_FORM, MAIL at runtime) · Font CharString Stack Machine Emulator (Type 1 bytecode decryption + emulation) · Cross-Object XRef Integrity Graph (phantom objects, orphan sleeper payloads, free-entry bugs, length fraud).
+**New engines (31–43):** PDF Token Obfuscation Detector (hex-escape decoding — /J#61vaScript → /JavaScript — whitespace-split keyword injection, formfeed byte evasion, null-byte header anomalies) · XFA FormCalc Script Extractor (the only static tool that parses FormCalc — exec/openURL/submit exfiltration/initialize auto-execute) · PDF Action Dependency Graph (directed graph of all actions — cycles, deep chains, fan-in maximization, dead sleeper nodes) · OCG Layer Cloaking (hidden optional content groups with never-visible and screen/print divergence detection) · Unicode & Invisible Text (rendering mode 3/7 invisible text, RLO override attacks U+202E, homograph domains) · Trailer Chain Forensics (raw /Prev chain walk — ID mutation, /Root swap Shadow Attack, encryption changes) · Codec Exploit Parameter Validation (CCITTFax OOB, JBIG2Globals CVE-2009-0658, DCT mismatch, LZW EarlyChange, multi-filter chains) · Physical Entropy Topology (PDF-structure-aware sliding-window entropy — post-EOF data, entropy cliffs) · Image Steganography (LSB chi-square test, tracking beacons, JPEG EXIF anomalies) · PDF/A Compliance Fraud Detection (false archival claims bypass DLP) · JavaScript Behavioral Emulation (Node.js vm + full Acrobat API stub — captures LAUNCH_URL, SUBMIT_FORM, MAIL at runtime) · Font CharString Stack Machine Emulator (Type 1 bytecode decryption + emulation) · Cross-Object XRef Integrity Graph (phantom objects, orphan sleeper payloads, free-entry bugs, length fraud).
 
 **Existing engines:** 15 static heuristic engines · dynamic behavioral sandbox (Linux namespace isolation, syscall tracing) · ML Intelligence Engine (SHAP explanations) · differential parsing across six independent parsers · polyglot binary detector · JavaScript AST deobfuscation · AcroForm field forensics · document revision history · annotation forensics · named tree analysis · content stream forensics · object stream analysis · threat intelligence (6.4M+ local indicators) · PDF signature forensics · phishing detection · embedded file analysis · TLSH fuzzy-hash campaign attribution · weighted correlation engine (60+ compound patterns). All 44 engines run server-side in a single request. Every indicator is tagged with a MITRE ATT&CK technique ID.
 
@@ -488,10 +488,12 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 13. Engine ㉔ computes a TLSH (Trend Locality Sensitive Hash) of the full PDF and a pHash perceptual hash of each page thumbnail — both similarity-preserving hashes. TLSH score <30 = near-identical; <100 = same campaign family. pHash hamming distance ≤8 = visual match. Also fingerprints extracted JavaScript by MD5 of sorted fragments for code-similarity matching. Campaign name is surfaced from MalwareBazaar family labels when a cluster match is found.
 14. Engine ㉕ analyses all AcroForm widget fields: JS triggers on field events (/AA keystroke/validate/calculate), SubmitForm exfiltration targets, hidden/NoExport fields, password-type fields, and calculation-order (/CO) chain exploitation.
 15. Engines ㉖–㉚ run the five structural-depth passes: Document Revision History (per-%%EOF metadata + object deltas), Annotation Forensics (all /Annot URI/JS/Launch/GoToR/SubmitForm actions), Named Tree Analysis (/Names /JavaScript registry, /AA count, /DocMDP, /Perms, UR3), Content Stream Forensics (PostScript exec/run/token/setpagedevice operators, ICC profile abuse, content bombs), and Object Stream Analysis (decompress every /ObjStm, re-scan for JS/Launch/EmbeddedFile/high-entropy payloads).
-16. Engine ㉛ (Correlation Engine) examines combinations of findings from all 30 preceding engines and adds weighted bonus points (35–100) for dangerous combinations (e.g. JavaScript + `/OpenAction` + high entropy = +100). 50+ compound patterns. Final score capped at 999.
-17. All 55 MITRE ATT&CK technique mappings are applied across all indicators. `mitre_techniques` list added to scan result for SIEM/SOAR integration.
-18. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score, ML malicious-probability score, and MITRE ATT&CK technique list.
-16. The client renders a 23-tab report: 📊 Summary, ⚠️ Threats, 📈 Score, ⚙️ Engines (per-engine two-panel browser — click any of 44 engines to see its full findings, structure fields, and special data), 🌐 URLs, 📦 Streams, 🧠 ML (LightGBM probability, SHAP bar chart, feature importances), 🔬 Sandbox, 🌍 Threat Intel, 🎯 MITRE ATT&CK, 🔬 Parsing, 🧬 Polyglot, 🎣 Phishing, 📎 Embedded, ✍️ Signature, 📜 History, 📌 Annotations, 🏷️ Metadata, 📋 Raw JSON, and 🔍 Raw Forensics (decoded stream content, JavaScript sources, all indicator contexts, complete structure dump). Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip with 31 chips shows each engine completing in sequence during the scan.
+16. Engine ㉛ (PDF Token Obfuscation Detector) decodes all hex-escaped PDF name tokens (/J#61vaScript → /JavaScript), detects whitespace-split keyword injection in raw bytes, counts formfeed byte injections, and flags null bytes in the first 64 KB header region.
+17. Engines ㉜–㊸ run thirteen deep forensic passes: XFA FormCalc Parser · Action Dependency Graph (cycles, deep chains, fan-in, sleeper nodes) · OCG Layer Cloaking (never-visible groups, screen/print divergence, hidden clickable links) · Unicode & Invisible Text (RLO U+202E, rendering modes 3/7, homograph domains) · Trailer Chain Forensics (raw /Prev walk, ID mutation, /Root swap Shadow Attack) · Codec Exploit Parameter Validation (CCITTFax OOB, JBIG2Globals CVE-2009-0658, DCT mismatch, multi-filter chains) · Physical Entropy Topology (post-EOF regions, entropy cliffs, header anomalies) · Image Steganography (LSB chi-square, tracking beacons, JPEG EXIF anomalies) · PDF/A Compliance Fraud Detection · JavaScript Behavioral Emulation (Node.js vm + Acrobat API stub) · Font CharString Emulator (Type 1 bytecode, seac OOB, stack depth) · XRef Integrity Graph (phantom objects, orphan sleepers, free-entry bugs, length fraud).
+18. Engine ㊹ (Correlation Engine) cross-references all 43 preceding engine findings and adds weighted bonus points for 60+ dangerous combinations (e.g. JavaScript + `/OpenAction` + high entropy = +100). Final score capped at 999.
+19. All 55 MITRE ATT&CK technique mappings are applied across all indicators. `mitre_techniques` list added to scan result for SIEM/SOAR integration.
+20. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score, ML malicious-probability score, and MITRE ATT&CK technique list.
+21. The client renders a 23-tab report: 📊 Summary, ⚠️ Threats, 📈 Score, ⚙️ Engines (per-engine two-panel browser — click any of 44 engines to see its full findings, structure fields, and special data), 🌐 URLs, 📦 Streams, 🧠 ML (LightGBM probability, SHAP bar chart, feature importances), 🔬 Sandbox, 🌍 Threat Intel, 🎯 MITRE ATT&CK, 🔬 Parsing, 🧬 Polyglot, 🎣 Phishing, 📎 Embedded, ✍️ Signature, 📜 History, 📌 Annotations, 🏷️ Metadata, 📋 Raw JSON, and 🔍 Raw Forensics (decoded stream content, JavaScript sources, all indicator contexts, complete structure dump). Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip with 44 chips shows each engine completing in sequence during the scan.
 
 ### Scoring
 
@@ -504,7 +506,7 @@ Each indicator contributes base points multiplied by `min(count, 3)`:
 | Medium | 10 |
 | Low | 3 |
 
-The Correlation Engine (㉕) adds weighted bonus points (35–100) on top for dangerous indicator combinations, using log-scaled weighted voting and ML anomaly feedback amplification. Final score is capped at 999.
+The Correlation Engine (㊹) adds weighted bonus points (35–100) on top for dangerous indicator combinations, using log-scaled weighted voting and ML anomaly feedback amplification. Final score is capped at 999.
 
 | Score | Risk Level |
 |---|---|
@@ -656,7 +658,7 @@ Runs `exiftool -PDF:all -XMP:all` to extract metadata layers that are invisible 
 - **XFA confirmation** — independently verifies `HasXFA` from EXIF metadata (cross-check against Engine ④)
 - **Embedded attachment detection** — surfaces `EmbeddedFileSize` / `EmbeddedFile` fields visible only via EXIF layer
 - **Summary export** — Creator, Producer, CreateDate, ModifyDate, PDFVersion, Linearized, PageCount, HasXFA, and Encryption exported to the structure dictionary for the Metadata tab
-- **Feeds Correlation Engine** — sets `exiftool_exploit_found` flag used by Engine ㉕ for compound scoring
+- **Feeds Correlation Engine** — sets `exiftool_exploit_found` flag used by Engine ㊹ for compound scoring
 
 ### Engine ⑪ — qpdf Structural Integrity
 
@@ -667,7 +669,7 @@ Runs `qpdf --check` to validate cross-reference tables, trailer dictionaries, an
 - **Structural errors** — other qpdf errors flagged as Medium risk (up to 3× count multiplier)
 - **Structural warnings** — minor anomalies flagged as Low risk
 - **Status export** — `qpdf_status` (ok / warnings / errors / damaged) exported to structure dictionary
-- **Feeds Correlation Engine** — sets `qpdf_damaged` flag used by Engine ㉕ for compound scoring
+- **Feeds Correlation Engine** — sets `qpdf_damaged` flag used by Engine ㊹ for compound scoring
 
 ### Engine ⑫ — YARA Rule Engine
 
@@ -698,7 +700,7 @@ Compiles and matches 21+ custom YARA rules targeting PDF-specific attack byte pa
 | `Dropper_Launcher` | Multi-stage dropper launch sequence patterns |
 
 - **Byte-level independence** — YARA scans raw file bytes, bypassing PDF parser layers entirely; catches patterns hidden in object streams
-- **Feeds Correlation Engine** — populates `yara_hits` set used by Engine ㉕ for compound scoring
+- **Feeds Correlation Engine** — populates `yara_hits` set used by Engine ㊹ for compound scoring
 
 ### Engine ⑬ — PeePDF Deep Analysis
 
@@ -707,9 +709,9 @@ Parses the full PDF object tree using the PeePDF framework — an entirely indep
 - **Vulnerability patterns** — PeePDF's built-in vulnerability detector flags known CVE pattern combinations; each confirmed pattern reported as Critical
 - **Suspicious element location** — reports exact object IDs for dangerous elements from both `Suspicious elements` and `Dangerous elements` dictionaries: `/Launch`, `getIcon()`, `printf()`, `unescape()`, `exportDataObject()`, `submitForm()`, `/EmbeddedFile`, `/JS`, `/JavaScript`, `eval()`, `/OpenAction`, `/AA`, `/XFA`, `/URI`
 - **JavaScript object inventory** — lists all PDF object IDs containing JavaScript
-- **Independent verification** — cross-checks PyMuPDF-based findings; if both parsers flag the same element, the compound risk in Engine ㉕ is elevated
+- **Independent verification** — cross-checks PyMuPDF-based findings; if both parsers flag the same element, the compound risk in Engine ㊹ is elevated
 - **Summary export** — PDF version, object count, stream count, and vulnerability count exported to structure dictionary
-- **Feeds Correlation Engine** — sets `peepdf_vuln_count` used by Engine ㉕ for compound scoring
+- **Feeds Correlation Engine** — sets `peepdf_vuln_count` used by Engine ㊹ for compound scoring
 
 ### Engine ⑭ — Dynamic Behavioral Sandbox
 
@@ -745,11 +747,11 @@ The only engine that actually *executes* the PDF. Renders the file through three
 | **Render timeout** | Renderer exceeds 20-second execution limit | High (+35) |
 
 - **Network isolation guarantee** — in a network namespace with no interfaces, any `connect()` is definitively malicious. There is no legitimate reason for a PDF renderer to initiate a network connection.
-- **Feeds Correlation Engine** — sets `sandbox_network_attempts`, `sandbox_mmap_exec_anon`, `sandbox_exec_attempts`, `sandbox_behavioral_score` flags used by Engine ㉕ for compound scoring
+- **Feeds Correlation Engine** — sets `sandbox_network_attempts`, `sandbox_mmap_exec_anon`, `sandbox_exec_attempts`, `sandbox_behavioral_score` flags used by Engine ㊹ for compound scoring
 
-### Engine ㉕ — Correlation Engine
+### Engine ㊹ — Correlation Engine
 
-Cross-references all findings from Engines ①–㉔ and scores 45+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
+Cross-references all findings from Engines ①–㊸ and scores 60+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
 
 **Weighted voting with log-scaling** — the engine uses a `weighted_vote()` function that applies logarithmic scaling to multi-engine confirmation signals, so each additional independent engine confirming a threat adds a progressively diminishing but always positive score increment. This prevents runaway score inflation from repeated low-quality signals while still rewarding genuine cross-engine convergence.
 
@@ -807,7 +809,7 @@ Cross-references all findings from Engines ①–㉔ and scores 45+ dangerous in
 | `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
 | Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
 
-**Cross-engine compound patterns (Engines ⑩–⑬ → ⑮)**
+**Cross-engine compound patterns (Engines ⑩–⑬ → ㊹)**
 
 | Combination | Bonus | Why |
 |---|---|---|
@@ -821,7 +823,7 @@ Cross-references all findings from Engines ①–㉔ and scores 45+ dangerous in
 | PeePDF vulnerability + JavaScript | +55–85 | Cross-engine vulnerability confirmation (scales with vuln count) |
 | PeePDF vulnerability + heap-spray | +65 | Full memory-corruption exploit chain confirmed by independent parser |
 
-**Dynamic sandbox compound patterns (Engine ⑭ → ⑮)**
+**Dynamic sandbox compound patterns (Engine ⑭ → ㊹)**
 
 | Combination | Bonus | Why |
 |---|---|---|
@@ -834,7 +836,7 @@ Cross-references all findings from Engines ①–㉔ and scores 45+ dangerous in
 | Dynamic shellcode + JavaScript | +90 | Runtime exec memory + JS delivery vector — JS staging shellcode payload confirmed |
 | Render timeout + JavaScript | +45 | Renderer hung >20 s + embedded JS — JS infinite-loop DoS exploit |
 
-**Threat Intelligence compound patterns (Engine ㉑ → ⑮)**
+**Threat Intelligence compound patterns (Engine ⑳ → ㊹)**
 
 | Combination | Bonus | Why |
 |---|---|---|
@@ -842,7 +844,7 @@ Cross-references all findings from Engines ①–㉔ and scores 45+ dangerous in
 | TI hash confirmed + JavaScript or auto-exec | +40 | Known malware + active content — confirmed exploit delivery |
 | TI hash confirmed + live sandbox beaconing | +50 | Three independent engines agree: known malware + runtime C2 |
 
-**Phishing compound patterns (Engine ㉓ → ⑮)**
+**Phishing compound patterns (Engine ㉒ → ㊹)**
 
 | Combination | Bonus | Why |
 |---|---|---|
@@ -851,7 +853,7 @@ Cross-references all findings from Engines ①–㉔ and scores 45+ dangerous in
 | QR code + suspicious embedded URL | +45 | QR routes victims to phishing pages while bypassing URL scanners |
 | High phishing score (≥3) + JavaScript | +40 | Urgency phrases + JS may auto-submit forms or redirect the victim |
 
-**Embedded file compound patterns (Engine ㉔ → ⑮)**
+**Embedded file compound patterns (Engine ㉓ → ㊹)**
 
 | Combination | Bonus | Why |
 |---|---|---|
@@ -860,7 +862,7 @@ Cross-references all findings from Engines ①–㉔ and scores 45+ dangerous in
 | OLE attachment with VBA + JavaScript | +80 | Dual payload: JS drops the OLE file, macros execute on open |
 | Embedded executable + ExifTool exploit-kit fingerprint | +90 | Professionally crafted dropper from a known attack toolkit |
 
-**Signature forensics compound patterns (Engine ㉒ → ⑮)**
+**Signature forensics compound patterns (Engine ㉑ → ㊹)**
 
 | Combination | Bonus | Why |
 |---|---|---|
@@ -915,7 +917,7 @@ When the RandomForest model is active, per-sample SHAP values are computed via `
 
 The Summary tab shows a lime ML panel: malicious probability bar (0–100%), model version, contextual adjustment note, SHAP feature importance chart (top contributing features with signed bars and human-readable explanation text), and false-positive / confirm-threat feedback buttons. Feedback POSTs `scan_id` + `feedback` to `api.php?operation=pdf-scan-feedback`.
 
-### Engine ⑱ — Differential Parsing Detection
+### Engine ⑰ — Differential Parsing Detection
 
 Runs **six** independent PDF parsers against the same file and compares their structural interpretation across **8 dimensions**. A hard 30-second SIGALRM wraps the entire engine; pdfminer runs as a subprocess for guaranteed hard-kill on timeout; qpdf uses targeted fast commands only (not `--json`).
 
@@ -942,7 +944,7 @@ Runs **six** independent PDF parsers against the same file and compares their st
 
 **Why it matters:** Attackers craft PDFs where one parser recovers hidden exploit objects, scripts, or attachments that another ignores entirely. Standard single-parser scanners miss this by design. Parser disagreement on any of the 8 dimensions is a strong indicator of deliberate evasion.
 
-### Engine ⑲ — Polyglot / Embedded Binary Detection
+### Engine ⑱ — Polyglot / Embedded Binary Detection
 
 Scans every PDF stream — both raw bytes and decompressed (zlib inflate, raw deflate) — for file magic byte signatures:
 
@@ -966,7 +968,7 @@ Scans every PDF stream — both raw bytes and decompressed (zlib inflate, raw de
 
 Polyglot files simultaneously satisfy the format rules of two or more file types. The PDF appears valid to all viewers while also containing a self-extracting archive or executable dropper that activates when saved to disk and opened by a compatible application. Used to smuggle payloads past content-type-based security controls.
 
-### Engine ⑳ — JavaScript AST Deobfuscation
+### Engine ⑲ — JavaScript AST Deobfuscation
 
 Extracts all JavaScript from the PDF (inline `/JS` literal strings and compressed streams containing `eval`, `unescape`, `String.fromCharCode`, `app.`, or `this.getField` keywords). Each fragment is passed through **Acorn** (a production JavaScript parser used by Babel and webpack) to build a full AST. The walker detects:
 
@@ -989,7 +991,7 @@ Extracts all JavaScript from the PDF (inline `/JS` literal strings and compresse
 
 ---
 
-### Engine ㉑ — Threat Intelligence
+### Engine ⑳ — Threat Intelligence
 
 Queries four local PostgreSQL tables — **zero external API calls per scan**, no rate limits, sub-millisecond lookups. All databases are downloaded in bulk and kept current by `tools/update_ti_feeds.py` running on cron.
 
@@ -1010,7 +1012,7 @@ Queries four local PostgreSQL tables — **zero external API calls per scan**, n
 
 ---
 
-### Engine ㉒ — PDF Signature Forensics
+### Engine ㉑ — PDF Signature Forensics
 
 Forensic analysis of PDF digital signatures using the **pyhanko** library.
 
@@ -1035,7 +1037,7 @@ Legitimate incremental updates (annotations, form fill-ins) are expected after s
 
 ---
 
-### Engine ㉓ — Phishing Detection
+### Engine ㉒ — Phishing Detection
 
 Multi-vector phishing analysis across four detection layers.
 
@@ -1065,7 +1067,7 @@ Structural analysis of PDF forms for the credential-exfiltration pattern:
 
 ---
 
-### Engine ㉔ — Embedded File Analysis
+### Engine ㉓ — Embedded File Analysis
 
 Forensic analysis of every embedded file attachment extracted from the PDF.
 
@@ -1108,7 +1110,7 @@ For embedded `.ps1` script attachments, the raw script content is regex-scanned 
 
 ---
 
-### Engine ㉕ — Campaign Attribution
+### Engine ㉔ — Campaign Attribution
 
 Fuzzy-hash similarity matching against the confirmed-malicious scan history.
 
@@ -1122,7 +1124,7 @@ TLSH is a locality-sensitive hash: similar files produce similar hashes, unlike 
 
 **Database comparison**
 
-After computing the TLSH hash, Engine ㉕ queries the 500 most recently confirmed-malicious PDFs from PostgreSQL:
+After computing the TLSH hash, Engine ㉔ queries the 500 most recently confirmed-malicious PDFs from PostgreSQL:
 
 ```sql
 SELECT id, sha256, tlsh_hash, label
@@ -1138,9 +1140,247 @@ Any match with score <100 is reported as a `Campaign Attribution Match` indicato
 
 **Structural fingerprint fallback**
 
-For PDFs too small for reliable TLSH (< 512 bytes), Engine ㉕ falls back to a structural fingerprint: object count, stream count, action type set, and encrypted flag. The fingerprint is stored as JSON in `structure.campaign_attribution.structural_fingerprint`.
+For PDFs too small for reliable TLSH (< 512 bytes), Engine ㉔ falls back to a structural fingerprint: object count, stream count, action type set, and encrypted flag. The fingerprint is stored as JSON in `structure.campaign_attribution.structural_fingerprint`.
 
 **MITRE ATT&CK:** Campaign matches are tagged `T1583` (Acquire Infrastructure) and `T1587.001` (Develop Capabilities: Malware).
+
+---
+
+### Engine ㉕ — AcroForm Field Forensics
+
+Deep analysis of every interactive form field in the PDF via PyMuPDF widget enumeration across all pages.
+
+- **JavaScript field triggers** — detects `/A` and `/AA` dictionary entries on widget objects; JavaScript fires on focus, blur, keystroke, validate, or calculate events — invisible during static visual review but executing in any Acrobat-compatible viewer
+- **Hidden NoExport fields** — form fields present in submitted form data but not displayed to the user
+- **Password-type fields** — credential harvesting indicators; a PDF containing a password field that submits to an external URL is a phishing artefact by definition
+- **SubmitForm exfiltration targets** — extracts and reports every URL to which form data is POSTed; flags external HTTP destinations as Critical
+- **Additional-action (/AA) JS triggers on field objects** — a secondary execution vector independent of /OpenAction; fires on any of 5+ field interaction events
+- **Calculation-order (/CO) chain exploitation** — adversaries reorder field calculation sequences to chain JS evaluations across fields, enabling multi-step payload staging hidden entirely within form arithmetic
+- **Feeds Correlation Engine** — AcroForm JS field + SubmitForm exfiltration target combination adds +85 bonus in Engine ㊹
+
+---
+
+### Engine ㉖ — Document Revision History
+
+Splits the PDF at every `%%EOF` boundary and extracts per-revision metadata and object inventory.
+
+- **Per-revision metadata** — author, producer, modification date for each incremental update
+- **Object deltas** — new, modified, and deleted object counts per revision
+- **Author identity change detection** — flags when the author/producer changes between revisions
+- **Execution vector injection** — detects `/JavaScript`, `/Launch`, `/EmbeddedFile`, and `/OpenAction` objects added after the original document creation
+- **Large late-stage injection** — flags final revisions introducing >10 new objects (structural signature of automated exploit staging; legitimate revision annotations add at most a handful of objects)
+- **Injection depth recording** — records which revision number introduced each execution vector
+- **Feeds Correlation Engine** — post-signature revision injection + execution vector combination adds +90 bonus in Engine ㊹
+
+---
+
+### Engine ㉗ — Annotation Forensics
+
+Enumerates every `/Annot` object across all pages and forensically analyses each action dictionary.
+
+- **Dangerous URI schemes** — `javascript:`, `data:`, `file://`, `vbscript:` in annotation URI fields
+- **JavaScript action triggers** — JavaScript actions attached to annotation interaction events
+- **/Launch actions** — annotations that spawn arbitrary external programs on click
+- **GoToR remote links** — annotations that open external files by path
+- **SubmitForm actions** — annotations that exfiltrate form data to external servers
+- **Coverage note** — annotation-borne payloads are completely invisible to scanners that only analyse raw bytes or page content streams
+- **Feeds Correlation Engine** — annotation JS trigger + auto-exec combination adds +75 bonus in Engine ㊹
+
+---
+
+### Engine ㉘ — Named Tree Analysis
+
+Catalogues the full PDF action infrastructure registered in the document catalog's name trees.
+
+- **Named JavaScript Registry** — `/Names /JavaScript` subtree; persistent JS objects callable by name from any action in the document without needing an inline definition
+- **/AA Additional Actions count** — event-driven triggers on page open/close, print, save, and field events
+- **/OpenAction type classification** — JavaScript, Launch, GoToR, URI, or GoTo
+- **DocMDP modification-prevention signatures** — lock out sanitizers and prevent incremental updates; used as an anti-analysis technique
+- **/Perms cryptographic permission restrictions** — flags non-standard permission blocks
+- **UR3 usage-rights signatures** — used to exploit extended viewer features in Acrobat
+- **Feeds Correlation Engine** — named JS registry + OpenAction combination adds +70 bonus; DocMDP bypass + content modification adds +80 bonus in Engine ㊹
+
+---
+
+### Engine ㉙ — Content Stream Forensics
+
+Inspects all decompressed content streams for dangerous operators and oversized payloads.
+
+- **PostScript execution operators** — `exec` (dynamic code execution), `run` (file execution), `token` (string-to-code eval), `setpagedevice` (PostScript-to-system passthrough — bridges to the PostScript interpreter from PDF context), `def`
+- **ICC color profile abuse** — malformed `/ICCBased` profiles of anomalous size exploit heap buffer overflows (CVE-2021-21017 class)
+- **Content bombs** — streams exceeding 5 MB that may exhaust parser memory or conceal oversized payloads
+- **Feeds Correlation Engine** — content stream PostScript exec + active content combination adds +65 bonus in Engine ㊹
+
+---
+
+### Engine ㉚ — Object Stream Analysis
+
+PDF 1.5+ allows multiple objects to be compressed together in a single `/ObjStm` stream. Scanners that only search raw bytes will miss any object inside a compressed container.
+
+- **Decompresses every `/ObjStm`** and re-scans the decompressed content
+- **JavaScript detection** — flags JavaScript found inside compressed object bundles
+- **/Launch action detection** — flags launch actions hidden in `/ObjStm`
+- **/EmbeddedFile references** — flags embedded file attachments concealed inside object streams
+- **High-entropy payloads** — entropy >7.5 bits inside a decompressed object stream suggests encrypted or compressed content nested within the container
+- **Complements Engine ③** — the Stream Decompressor handles stream objects directly; this engine specifically targets the object-container format that wraps multiple objects in one compressed blob
+- **Feeds Correlation Engine** — object stream concealment + active content combination adds +80 bonus in Engine ㊹
+
+---
+
+### Engine ㉛ — PDF Token Obfuscation Detector
+
+Decodes PDF name token hex-escape sequences and detects evasion techniques that bypass raw-byte scanners.
+
+- **Hex-escape decoding** — reads all `/Name` tokens from raw bytes, decodes `#HH` sequences (`/J#61vaScript` → `/JavaScript`), and checks decoded names against a dangerous-keyword list: `JavaScript`, `Launch`, `OpenAction`, `EmbeddedFile`, `AA`, `URI`, `SubmitForm`, `ImportData`, `GoToR`, `RichMedia`, and others
+- **Obfuscation statistics** — counts total hex-encoded name tokens, dangerous-keyword obfuscations, and unique obfuscated forms; every obfuscated dangerous keyword triggers a Critical indicator
+- **Whitespace-split keyword injection** — scans raw bytes for split sequences like `/Java\nscript` or `/Lau\tch`; evades simple string scanners that require contiguous byte matches
+- **Formfeed byte injection** — counts `0x0C` formfeed bytes in the first 64 KB; formfeed injection is a classic evasion marker that confuses line-based signature engines
+- **Null bytes in header region** — null bytes within the first 64 KB PDF header region, another scanner-confusion technique
+- **Feeds Correlation Engine** — token obfuscation + JS keyword combination adds +85 bonus in Engine ㊹
+
+---
+
+### Engine ㉜ — XFA FormCalc Parser
+
+Extracts and decompresses the XFA (XML Forms Architecture) data stream and parses embedded FormCalc scripts.
+
+- **FormCalc auto-execute events** — detects `initialize` and `ready` event handlers that fire automatically on form load without user interaction
+- **openURL / submit calls** — FormCalc calls that silently exfiltrate data or fetch remote resources on form open
+- **exec() calls** — passes strings to a FormCalc eval-style function, enabling dynamic code execution
+- **Embedded JavaScript** — JavaScript snippets inside the XFA XML wrapper; bypasses AcroForm-specific scanners that only inspect widget objects
+- **Structure inspection** — XFA data streams may be compressed with `/FlateDecode`; engine decompresses before parsing
+- **Feeds Correlation Engine** — XFA exec + auto-fire combination adds +80 bonus in Engine ㊹
+
+---
+
+### Engine ㉝ — PDF Action Dependency Graph
+
+Constructs a directed graph of the complete PDF action chain by following every `/Next` pointer.
+
+- **Circular action cycles** — detects loops in the action graph (infinite execution; crashes strict viewers)
+- **Deep chains** — action chains exceeding 10 hops overflow parser stack depth in hardened viewers
+- **High fan-in nodes** — single action objects referenced simultaneously from many triggers (covert shared-execution points invisible to linear analysis)
+- **Sleeper nodes** — actions present in the graph but unreachable from nominal entry points; planted for deferred detonation via a separately triggered entry
+- **Graph serialisation** — full action graph included in the structure for raw forensic inspection
+- **Feeds Correlation Engine** — action cycle + JS node combination adds +75 bonus in Engine ㊹
+
+---
+
+### Engine ㉞ — OCG Layer Cloaking
+
+Enumerates every Optional Content Group (`/OCG`) layer in the `/OCProperties` dictionary.
+
+- **Never-visible layers** — display state forced off in all circumstances; used to hide malicious content from visual review while keeping it fully parsed by the viewer engine
+- **Screen/print divergence** — content visible on screen but suppressed in print (or vice versa); used in watermarking evasion and DLP bypass attacks
+- **Hidden clickable links inside invisible layers** — fully interactive in Acrobat despite being visually absent; a zero-click execution vector in social-engineering scenarios
+- **Feeds Correlation Engine** — OCG hidden link + active content combination adds +70 bonus in Engine ㊹
+
+---
+
+### Engine ㉟ — Unicode & Invisible Text Forensics
+
+Scans text streams and document strings for Unicode control characters and invisible rendering modes.
+
+- **Bidirectional control characters** — U+202E (RLO), U+200F (RLM), U+202D (LRO), U+200E (LRM), U+2066–U+2069 (isolate markers); used in CVE-2023-36884 and filename-spoofing attacks
+- **Rendering mode 3** — "invisible text" mode; used by Trojan-Source-style attacks to embed machine-readable payload over visible decoy text; also used by some phishing kits to place hidden form-fill instructions on a page
+- **Rendering mode 7** — clip mode; advanced invisibility variant
+- **Homograph domains** — Cyrillic, Greek, and Armenian lookalike characters confusable with ASCII in URL strings; detected via Unicode confusable analysis
+- **Feeds Correlation Engine** — Unicode RLO injection + active content combination adds +65 bonus in Engine ㊹
+
+---
+
+### Engine ㊱ — Trailer Chain Forensics
+
+Walks the raw PDF trailer chain via `/Prev` byte-offset pointers without relying on any PDF library's repair logic.
+
+- **Chain reconstruction** — records `/ID` array pair, `/Root` reference, and `/Prev` offset for each trailer in the chain, building a chronological history of all incremental updates
+- **Document ID mutation** — both entries of the `/ID` array should be stable after document creation; mutation across updates is a structural anomaly and a forgery indicator
+- **/Root reference swaps** — the Shadow Document Attack; a signed PDF whose signed version and displayed version reference different catalog root objects; allows displaying different content than what was signed
+- **Malformed /Prev pointers** — byte offsets that would confuse incremental-update-aware parsers
+- **Feeds Correlation Engine** — trailer /Root swap + execution vector combination adds +90 bonus in Engine ㊹
+
+---
+
+### Engine ㊲ — Codec Exploit Parameter Validation
+
+Audits every compressed stream's filter parameters for known exploit patterns.
+
+- **CCITTFaxDecode** — validates `Columns` and `Rows` against the declared stream length; out-of-bounds values trigger heap overflows in multiple decoder implementations
+- **JBIG2Decode** — checks for a `/JBIG2Globals` reference stream (required for CVE-2009-0658 / Pwn2Own 2009 Adobe Reader exploit, CVSS 9.3)
+- **DCTDecode** — validates that declared stream length is plausible for the claimed image dimensions; extreme mismatches indicate a crafted payload
+- **Multi-filter chains** — streams using 3+ stacked decoders trigger a Medium-risk indicator; multi-layer codec chains slow forensic analysis and can trigger parser differential vulnerabilities since each decoder may interpret the preceding output differently
+- **Feeds Correlation Engine** — JBIG2 + JavaScript combination adds +100 bonus in Engine ㊹; codec OOB + active content adds +75 bonus
+
+---
+
+### Engine ㊳ — Physical Entropy Topology
+
+Computes per-256-byte sliding-window Shannon entropy across raw file bytes with PDF structural awareness.
+
+- **Post-EOF high-entropy regions** — encrypted or compressed payloads appended after the last `%%EOF` marker; invisible to all structure-respecting parsers
+- **Entropy cliffs** — sudden sharp transitions between low-entropy and high-entropy regions indicating injection boundaries (payload grafted onto a clean document body)
+- **Header entropy anomalies** — unexpected compression or encryption in the first 256 bytes of the file
+- **Structural partitioning** — uses the PDF object offset table to partition the entropy map into regions (header, objects, streams, trailer, post-EOF) for context-aware interpretation
+- **Feeds Correlation Engine** — post-EOF entropy + execution vector combination adds +85 bonus in Engine ㊹
+
+---
+
+### Engine ㊴ — Image Steganography & Tracking Beacons
+
+Extracts all embedded images and applies statistical steganalysis and beacon detection.
+
+- **LSB chi-square analysis** — computes a chi-square statistic on the least-significant bits of each colour channel of extracted JPEG/PNG/BMP images; a score above threshold indicates non-random LSB distribution consistent with LSB steganography (Steghide, OpenStego, etc.)
+- **Tracking beacons** — 1×1 or sub-10px images that are HTTP/HTTPS URIs; invisible tracker pixels that phone home when the PDF is opened in a connected viewer
+- **JPEG EXIF anomalies** — parses EXIF metadata from all embedded JPEG images; flags maker notes, GPS tags, and unusual tag combinations that may fingerprint the author's device or embed covert data in EXIF fields
+- **Feeds Correlation Engine** — steganography + exfiltration target combination adds +70 bonus in Engine ㊹
+
+---
+
+### Engine ㊵ — PDF/A Compliance Fraud Detector
+
+Checks whether a PDF claims PDF/A conformance and validates that the document actually complies.
+
+- **False conformance claims** — detects documents with `pdfaid:conformance` and `pdfaid:part` XMP metadata that contain features forbidden by the PDF/A standard: JavaScript, embedded executables, non-embedded fonts, encryption, or external references
+- **DLP bypass significance** — many enterprise email gateways and DLP systems whitelist PDF/A as "archival safe"; a PDF/A claim on a malicious document is a deliberate evasion technique targeting these systems
+- **Conformance level mismatch** — detects claims inconsistent with the stated conformance level (e.g. claiming PDF/A-1a but using PDF/A-2-only features)
+- **Feeds Correlation Engine** — PDF/A fraud claim + active content combination adds +80 bonus in Engine ㊹
+
+---
+
+### Engine ㊶ — JavaScript Behavioral Emulation
+
+Executes extracted JavaScript in a sandboxed Node.js `vm` context with a stub of the Acrobat JavaScript API.
+
+- **Acrobat API stub** — `app`, `this`, `event`, `util`, `console`, `Doc`, `Field`, and other Acrobat objects are stubbed; dangerous methods are intercepted and recorded: `app.launchURL()`, `this.submitForm()`, `app.openDoc()`, `app.execMenuItem()`, `util.printd()`
+- **Runtime call log** — every dangerous API call is logged with function name, argument list, and execution timestamp
+- **Obfuscated eval detection** — intercepts `eval()` and `new Function()` at runtime; captures the assembled payload string even when it is constructed via string concatenation or character-code arrays that static AST analysis (Engine ⑲) cannot decode
+- **String-concatenation assembly** — detects dangerous payloads that are only assembled and evaluated at runtime
+- **Catches what static analysis misses** — complements Engine ⑲ (JS AST Deobfuscation) by executing the code rather than parsing its structure
+- **Feeds Correlation Engine** — JS emulation live call + obfuscated eval combination adds +95 bonus in Engine ㊹
+
+---
+
+### Engine ㊷ — Font CharString Emulator
+
+Decrypts and emulates Type 1 font CharString programs using the standard eexec and charstring decryption algorithms.
+
+- **seac (accented-character) operator** — calls two other glyphs by name, enabling recursive execution that overflows the call stack in vulnerable renderers; used in exploits targeting Adobe Reader ≤9
+- **Excessive stack depth** — CharString programs that push ≥200 values onto the stack trigger stack exhaustion in strict interpreters
+- **Abnormal subroutine depth** — recursion deeper than 10 levels in the `subr`/`globalsubr` call chain; indicates a deliberately constructed stack-smashing font
+- **High-entropy eexec region** — unusually high entropy in the eexec-encrypted portion of the font binary indicates obfuscated content beyond normal CharString variation
+- **Feeds Correlation Engine** — font seac OOB + JavaScript combination adds +85 bonus in Engine ㊹
+
+---
+
+### Engine ㊸ — XRef Integrity Graph
+
+Builds a complete cross-reference graph by parsing both traditional XRef tables and compressed XRef streams (`/XRef` objects, PDF 1.5+).
+
+- **Phantom objects** — XRef entries pointing to byte offsets with no valid object header at the declared position
+- **Orphan sleepers** — objects present at valid byte offsets but absent from every XRef table; reachable only through raw byte parsing, not through standard readers; used as hidden payload containers that activate only in exploited parsers
+- **Free-entry exploitation** — XRef free-list entries (`f` type) with generation numbers deviating from standard increments; used to hide objects that become reachable after a use-after-free vulnerability in the PDF parser
+- **Object length fraud** — stream objects whose declared `/Length` diverges from the actual byte count between `stream` and `endstream` markers; parsers that trust the declared length read different content than parsers that scan for the marker
+- **Feeds Correlation Engine** — XRef phantom object + orphan sleeper combination adds +90 bonus in Engine ㊹
 
 ---
 
