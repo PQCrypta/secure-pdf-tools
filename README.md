@@ -19,7 +19,7 @@ Four specific gaps drove this project:
 Existing tools retain files for cleanup windows (1 hour, 2 hours, "as soon as possible"). The server-side `send_file()` function in this project calls `cleanup()` immediately after `readfile()` — the temp directory is deleted while the download is still in flight. There is no retention window because there is no buffer.
 
 **2. No multi-engine threat analysis for PDFs**
-PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 25 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine with SHAP explainability (IsolationForest + RandomForest + LightGBM on a 38-feature vector), a differential parsing engine comparing six independent parsers across 8 structural dimensions, a polyglot binary detector, a JavaScript AST deobfuscator, fully offline local threat intelligence (URLhaus · MalwareBazaar · ThreatFox — 6.4M+ indicators, zero external API calls), PDF signature forensics (ByteRange shadow-document detection), phishing detection (credential harvesting, brand impersonation, QR codes), embedded file analysis (PE/ELF/OLE/VBA), and TLSH fuzzy-hash campaign attribution. Every indicator is mapped to a MITRE ATT&CK technique ID.
+PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 31 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine with SHAP explainability (IsolationForest + RandomForest + LightGBM on a 38-feature vector), a differential parsing engine comparing six independent parsers across 8 structural dimensions, a polyglot binary detector, a JavaScript AST deobfuscator, fully offline local threat intelligence (URLhaus · MalwareBazaar · ThreatFox — 6.4M+ indicators, zero external API calls), PDF signature forensics (ByteRange shadow-document detection), phishing detection (credential harvesting, brand impersonation, QR codes), embedded file analysis (PE/ELF/OLE/VBA), and TLSH fuzzy-hash campaign attribution. Every indicator is mapped to a MITRE ATT&CK technique ID.
 
 **3. No post-quantum cryptography in document workflows**
 All existing tools use AES-256 at best. This project integrates 31 post-quantum algorithms (NIST-standardised ML-KEM-1024, HQC-128/192/256, FN-DSA variants, and hybrid modes) for PDF encryption, running client-side in the browser before any data is transmitted.
@@ -70,7 +70,7 @@ Proprietary SaaS tools describe their operations in marketing language. This pro
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Forensics Scanner** | [/tools/scan.php](https://pqpdf.com/tools/scan.php) | Forensic analysis across 25 independent engines: structural integrity, 45+ byte-level signatures, sliding-window stream entropy analysis, object graph traversal with recursive action chain detection, URL artifact extraction, metadata provenance analysis (ExifTool EXIF/XMP), font anomaly detection, CVE pattern matching, qpdf structural integrity (partial encryption detection), YARA rule matching (21+ custom rules), PeePDF + pikepdf deep object analysis, dynamic behavioural sandbox (strace + isolated Linux namespaces), correlation analysis (cross-engine vote counting), ClamAV signature scanning (700k+ signatures + custom .ldb), ML Intelligence Engine with SHAP explainability (IsolationForest + RandomForest + LightGBM ensemble, model drift detection), differential parser comparison (MuPDF · Poppler · Ghostscript · qpdf · pdfminer · pdf.js, 8 dimensions), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, HTML, WASM, Python bytecode, OLE and more), JavaScript AST deobfuscation (acorn + Node.js VM sandbox), fully offline threat intelligence (URLhaus · MalwareBazaar · ThreatFox · FeodoTracker · OpenPhish — 6.4M+ indicators, zero external API calls), PDF signature forensics (ByteRange coverage / shadow document detection / weak algorithm detection), phishing detection (credential harvesting · brand impersonation · QR code decoding · OCR fallback), embedded file analysis (pdfdetach · PE import table · OLE VBA DDEAUTO · ZIP archive content listing · nested PDF detection), TLSH fuzzy-hash + pHash visual similarity + JS fingerprint campaign attribution. MITRE ATT&CK mapping on every indicator. Returns a scored forensic report across 18 analysis tabs with per-engine two-panel browser, raw forensics view, and **9-mode sanitize** (flatten to images · strip active content · remove JavaScript · remove embedded files · remove XFA · remove rich media · normalize structure · flatten forms · strip metadata). |
+| **PDF Forensics Scanner** | [/tools/scan.php](https://pqpdf.com/tools/scan.php) | Forensic analysis across 31 independent engines: structural integrity, 45+ byte-level signatures, sliding-window stream entropy analysis, object graph traversal with recursive action chain detection, URL artifact extraction, metadata provenance analysis (ExifTool EXIF/XMP), font anomaly detection, CVE pattern matching, qpdf structural integrity (partial encryption detection), YARA rule matching (21+ custom rules), PeePDF + pikepdf deep object analysis, dynamic behavioural sandbox (strace + isolated Linux namespaces), correlation analysis (cross-engine vote counting), ClamAV signature scanning (700k+ signatures + custom .ldb), ML Intelligence Engine with SHAP explainability (IsolationForest + RandomForest + LightGBM ensemble, model drift detection), differential parser comparison (MuPDF · Poppler · Ghostscript · qpdf · pdfminer · pdf.js, 8 dimensions), polyglot/embedded binary detection (PE, ELF, ZIP, Mach-O, HTML, WASM, Python bytecode, OLE and more), JavaScript AST deobfuscation (acorn + Node.js VM sandbox), fully offline threat intelligence (URLhaus · MalwareBazaar · ThreatFox · FeodoTracker · OpenPhish — 6.4M+ indicators, zero external API calls), PDF signature forensics (ByteRange coverage / shadow document detection / weak algorithm detection), phishing detection (credential harvesting · brand impersonation · QR code decoding · OCR fallback), embedded file analysis (pdfdetach · PE import table · OLE VBA DDEAUTO · ZIP archive content listing · nested PDF detection), TLSH fuzzy-hash + pHash visual similarity + JS fingerprint campaign attribution. MITRE ATT&CK mapping on every indicator. Returns a scored forensic report across 20 analysis tabs with per-engine two-panel browser, raw forensics view, and **9-mode sanitize** (flatten to images · strip active content · remove JavaScript · remove embedded files · remove XFA · remove rich media · normalize structure · flatten forms · strip metadata). |
 | **Protect PDF** | [/tools/protect.php](https://pqpdf.com/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/tools/unlock.php](https://pqpdf.com/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/tools/redact.php](https://pqpdf.com/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. |
@@ -443,7 +443,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 |---|---|---|---|---|---|---|
 | File retention after processing | **Deleted during download** (cleanup in send_file()) | Up to 1 hour (published policy) | Up to 1 hour | Up to 2 hours | Up to 1 hour | Up to 1 hour |
 | Account required | **No** | Yes (for most features) | No (limited) | No (limited) | No | No |
-| Threat scanning engines | **25 independent engines** incl. ML + SHAP + sandbox + TI + MITRE ATT&CK + phishing + campaign attribution | None | None | None | None | None |
+| Threat scanning engines | **31 independent engines** incl. ML + SHAP + sandbox + TI + MITRE ATT&CK + phishing + campaign attribution | None | None | None | None | None |
 | ML-based anomaly detection | **Yes** (IsolationForest + RandomForest + LightGBM ensemble, 38-feature vector, continuously retrained, model drift detection) | No | No | No | No | No |
 | Dynamic behavioral sandbox | **Yes** (strace + Linux namespaces, full syscall trace) | No | No | No | No | No |
 | Post-quantum encryption | **Yes** (31 algorithms via @noble/post-quantum, client-side) | No | No | No | No | No |
@@ -465,12 +465,12 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 
 [/tools/scan.php](https://pqpdf.com/tools/scan.php)
 
-15 static analysis engines, one dynamic behavioral sandbox, an ML Intelligence Engine with SHAP per-sample explanations, a differential parsing engine, a polyglot/embedded binary detector, a JavaScript AST deobfuscation engine, live threat intelligence, PDF signature forensics, phishing detection, embedded file analysis, and TLSH fuzzy-hash campaign attribution — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing, and every scan is persisted to PostgreSQL to continuously improve the ML models. All 25 engines run server-side in a single request. Every indicator is tagged with a MITRE ATT&CK technique ID. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
+15 static analysis engines, one dynamic behavioral sandbox, an ML Intelligence Engine with SHAP per-sample explanations, a differential parsing engine, a polyglot/embedded binary detector, a JavaScript AST deobfuscation engine, live threat intelligence, PDF signature forensics, phishing detection, embedded file analysis, and TLSH fuzzy-hash campaign attribution — the PDF is rendered through three independent interpreters inside isolated Linux namespaces with full syscall tracing, and every scan is persisted to PostgreSQL to continuously improve the ML models. All 31 engines run server-side in a single request. Every indicator is tagged with a MITRE ATT&CK technique ID. The file is held in a temporary directory during the scan and deleted immediately after (or after a sanitize follow-up using the session token issued with the report).
 
 ### How It Works
 
 1. The PDF is uploaded and saved to an isolated temporary directory. A session token is returned for optional sanitize follow-up.
-2. A Python script runs all 13 static heuristic engines (including ExifTool, qpdf, YARA, and PeePDF) against the raw bytes and parsed object graph via PyMuPDF.
+2. A Python script runs all 16 static heuristic engines (including ExifTool, qpdf, YARA, PeePDF, AcroForm Field Forensics, Document Revision History, Annotation Forensics, Named Tree Analysis, Content Stream Forensics, and Object Stream Analysis) against the raw bytes and parsed object graph via PyMuPDF.
 3. Engine ⑭ renders the PDF through Ghostscript, MuPDF, and Poppler inside isolated Linux namespaces (`unshare --net --pid --mount`) with all syscalls captured by `strace`. Detects runtime behavior invisible to static analysis.
 4. Engine ⑮ calls `clamdscan --no-summary` against the PDF. The `clamav` user is a member of the `www-data` group so the clamd daemon reads upload files directly — no `--fdpass` needed, no slow single-process fallback (~20 ms per scan).
 5. Engine ⑯ extracts a 38-feature vector from all preceding engine outputs, applies Bayesian contextual scoring, runs IsolationForest anomaly detection (unsupervised — works from scan 1), RandomForest classification (activates at ≥50 labeled samples), and LightGBM ensemble scoring (gradient boosting, class-imbalance weighted). Reports per-scan feature importance via SHAP TreeExplainer (RandomForest/LightGBM) and KernelExplainer (IsolationForest). Model drift detection warns when models are >30 days old. Scan features, scores, and auto-inferred labels are persisted to PostgreSQL. Training runs every 30 minutes via cron.
@@ -482,10 +482,12 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 11. Engine ㉒ runs phishing analysis: 30+ urgency/deception phrases, brand impersonation keywords (Microsoft, Apple, PayPal, DocuSign, etc.), AcroForm `SubmitForm` + password-field credential harvesting detection, and QR code decoding via `zbarimg` with suspicious domain scoring.
 12. Engine ㉓ uses `pdfdetach` to extract every embedded file attachment and inspects each for PE/ELF/OLE/OOXML/script magic bytes, VBA macro detection in OOXML containers, strings extraction from executables, nested PDF detection, and full ZIP content listing for non-OOXML archives (flags dangerous executables/scripts inside ZIP payloads).
 13. Engine ㉔ computes a TLSH (Trend Locality Sensitive Hash) of the full PDF and a pHash perceptual hash of each page thumbnail — both similarity-preserving hashes. TLSH score <30 = near-identical; <100 = same campaign family. pHash hamming distance ≤8 = visual match. Also fingerprints extracted JavaScript by MD5 of sorted fragments for code-similarity matching. Campaign name is surfaced from MalwareBazaar family labels when a cluster match is found.
-14. Engine ㉕ examines combinations of findings from all preceding engines and adds weighted bonus points (35–100) for dangerous combinations (e.g. JavaScript + `/OpenAction` + high entropy = +100). Final score capped at 999.
-14. All 55 MITRE ATT&CK technique mappings are applied across all indicators. `mitre_techniques` list added to scan result for SIEM/SOAR integration.
-15. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score, ML malicious-probability score, and MITRE ATT&CK technique list.
-16. The client renders an 18-tab report: 📊 Summary, ⚠️ Threats, 📈 Score, ⚙️ Engines (per-engine two-panel browser — click any of 25 engines to see its full findings, structure fields, and special data), 🌐 URLs, 📦 Streams, 🧠 ML (LightGBM probability, SHAP bar chart, feature importances), 🔬 Sandbox, 🌍 Threat Intel, 🎯 MITRE ATT&CK, 🔬 Parsing, 🧬 Polyglot, 🎣 Phishing, 📎 Embedded, ✍️ Signature, 🏷️ Metadata, 📋 Raw JSON, and 🔍 Raw Forensics (decoded stream content, JavaScript sources, all indicator contexts, complete structure dump). Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip with 25 chips shows each engine completing in sequence during the scan.
+14. Engine ㉕ analyses all AcroForm widget fields: JS triggers on field events (/AA keystroke/validate/calculate), SubmitForm exfiltration targets, hidden/NoExport fields, password-type fields, and calculation-order (/CO) chain exploitation.
+15. Engines ㉖–㉚ run the five structural-depth passes: Document Revision History (per-%%EOF metadata + object deltas), Annotation Forensics (all /Annot URI/JS/Launch/GoToR/SubmitForm actions), Named Tree Analysis (/Names /JavaScript registry, /AA count, /DocMDP, /Perms, UR3), Content Stream Forensics (PostScript exec/run/token/setpagedevice operators, ICC profile abuse, content bombs), and Object Stream Analysis (decompress every /ObjStm, re-scan for JS/Launch/EmbeddedFile/high-entropy payloads).
+16. Engine ㉛ (Correlation Engine) examines combinations of findings from all 30 preceding engines and adds weighted bonus points (35–100) for dangerous combinations (e.g. JavaScript + `/OpenAction` + high entropy = +100). 50+ compound patterns. Final score capped at 999.
+17. All 55 MITRE ATT&CK technique mappings are applied across all indicators. `mitre_techniques` list added to scan result for SIEM/SOAR integration.
+18. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score, ML malicious-probability score, and MITRE ATT&CK technique list.
+16. The client renders a 20-tab report: 📊 Summary, ⚠️ Threats, 📈 Score, ⚙️ Engines (per-engine two-panel browser — click any of 31 engines to see its full findings, structure fields, and special data), 🌐 URLs, 📦 Streams, 🧠 ML (LightGBM probability, SHAP bar chart, feature importances), 🔬 Sandbox, 🌍 Threat Intel, 🎯 MITRE ATT&CK, 🔬 Parsing, 🧬 Polyglot, 🎣 Phishing, 📎 Embedded, ✍️ Signature, 📜 History, 📌 Annotations, 🏷️ Metadata, 📋 Raw JSON, and 🔍 Raw Forensics (decoded stream content, JavaScript sources, all indicator contexts, complete structure dump). Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip with 31 chips shows each engine completing in sequence during the scan.
 
 ### Scoring
 
@@ -1140,7 +1142,7 @@ For PDFs too small for reliable TLSH (< 512 bytes), Engine ㉕ falls back to a s
 
 ### MITRE ATT&CK Mapping
 
-Every indicator produced by all 25 engines is tagged with one or more MITRE ATT&CK technique IDs via a 55-entry lookup table keyed on indicator name substrings:
+Every indicator produced by all 31 engines is tagged with one or more MITRE ATT&CK technique IDs via a 55-entry lookup table keyed on indicator name substrings:
 
 | Technique ID | Name | Triggered by |
 |---|---|---|
@@ -1161,34 +1163,86 @@ Every indicator produced by all 25 engines is tagged with one or more MITRE ATT&
 
 The full `mitre_techniques` array is included in every scan result JSON for SIEM/SOAR integration.
 
+### Forensic Console
+
+Before and during scanning, a live event log panel ("Forensic Console") streams timestamped events to the browser. It sits above the results area and auto-scrolls. Appearance is terminal-style: macOS traffic-light dots, monospace font, dark background.
+
+Each log line has three parts:
+
+| Part | Format | Example |
+|---|---|---|
+| Timestamp | `HH:MM:SS.mmm` | `21:47:52.089` |
+| Badge | Colour-coded label | `UPLOAD` · `INFO` · `START` · `DONE` · `WARN` · `ERROR` · `Clean` |
+| Message | Human-readable description | `Upload complete (0.11s) — token: pdftool_…` |
+
+Section dividers (`── Upload ──`, `── Engines ──`, `── Results ──`) separate phases. The console can be collapsed/expanded and cleared with header buttons. When all 31 engines complete, a `Clean` or risk-level badge appears alongside the final elapsed time.
+
+### Result Banner and Risk Levels
+
+The top of the Summary tab shows a full-width risk banner. Five levels, colour-coded:
+
+| Level | Icon | Score range | Banner class |
+|---|---|---|---|
+| Clean | ✅ | 0 | Green |
+| Low Risk | 🟡 | 1–99 | Yellow |
+| Suspicious | 🟠 | 100–299 | Orange |
+| High Risk | ⚠️ | 300–599 | Red |
+| Dangerous | 🔴 | 600–999 | Dark red |
+
+Below the banner title a score meter bar fills 0–999 left-to-right in a matching colour. The label shows `Risk Score: X / 999`.
+
+### Statistics Grid
+
+The 15-cell stats grid below the banner summarises key structural fields at a glance. Three cells are interactive — clicking them jumps directly to the corresponding tab:
+
+| Cell | Clickable | Alert (red) when |
+|---|---|---|
+| Pages | — | — |
+| Objects | — | — |
+| File Size | — | — |
+| PDF Version | — | — |
+| Encrypted | — | Always (if true) |
+| Embedded Files | ✓ → Embedded tab | > 0 |
+| Form Fields | — | — |
+| Annotations | — | — |
+| Links | — | — |
+| %%EOF Markers | — | > 2 |
+| XRef Tables | — | > 3 |
+| Total Streams | ✓ → Streams tab | — |
+| High-Entropy Streams | — | > 0 |
+| URLs Found | ✓ → URLs tab | > 0 |
+| Threats Found | ✓ → Threats tab | > 0 |
+
+All cells have `data-tip` tooltips on hover explaining what the field measures.
+
 ### Report Tabs
 
-The tab bar uses a pill-style design with background highlighting on hover and an amber-tinted active state. Stat cards for **Threats Found**, **URLs Found**, and **Total Streams** are clickable — clicking navigates directly to the corresponding tab and smooth-scrolls the panel into view.
+The tab bar uses a pill-style design with background highlighting on hover and an amber-tinted active state. Dynamic badges on several tabs update live during the scan (threat count, ML %, MITRE technique count, etc.).
 
-| Tab | Contents |
-|---|---|
-| **📊 Summary** | Risk banner (Clean / Low Risk / Suspicious / High Risk / Dangerous), composite score meter (0–999), 15-cell stats grid (clickable Threats/URLs/Streams cards), engines-completed pill strip (25 chips), top 5 threats preview with link to full Threats tab |
-| **⚠️ Threats** | All indicators grouped by risk level (Critical → High → Medium → Low), each as a full card showing badge, engine, count pill, key title, description, and byte-context snippet |
-| **📈 Score** | Score gauge (0–999) with risk level label and progress bar, per-engine contribution bars (points breakdown by engine), full "every indicator scored" table (engine / indicator / risk / base points / count / total pts) |
-| **⚙️ Engines** | Two-panel per-engine browser: left sidebar lists all 25 engines with status dot (green=clean, orange=findings, grey=skipped) and findings count pill. Clicking any engine loads its full indicator cards, relevant structure fields, and engine-specific data (streams table for Engine 3, URL list for Engine 5, SHAP bars for Engine 16, per-parser table for Engine 17, etc.) |
-| **🌐 URLs** | All unique HTTP/HTTPS URLs extracted from raw bytes and decompressed streams, with per-URL copy-to-clipboard button |
-| **📦 Streams** | Table of displayed streams (top 40 of N total; explains decompressed count vs skipped images/fonts). Columns: xref, type, decompressed size, Shannon entropy bar, suspicious flag, matched pattern list. Suspicious streams highlighted in amber. |
-| **🧠 ML** | LightGBM + IsolationForest + RandomForest ensemble: malicious probability bar, model version, context adjustment note, SHAP feature explanation bar chart (per-feature directional contribution, red=malicious/green=benign), feature importance bars, feedback buttons. Tab badge shows current malicious % score. |
-| **🔬 Sandbox** | Dynamic behavioural sandbox trace: behavioral score, network attempts, exec attempts, mmap-exec, fork count, filesystem escape attempts, timeout flag, syscall summary, and behavioural indicators |
-| **🌍 Threat Intel** | Local offline TI results (URLhaus Hash / MalwareBazaar / ThreatFox IOC / FeodoTracker / OpenPhish — Clean or MATCH with family label), MITRE ATT&CK technique chip grid, SHA-256 hash display, campaign attribution (TLSH + pHash + JS fingerprint), domain-level hits. Tab badge shows `!` for confirmed malicious. |
-| **🎯 MITRE** | All MITRE ATT&CK technique IDs mapped from indicators — technique ID + name + tactic, grouped by tactic. Full technique chip grid. |
-| **🔬 Parsing** | Differential Parsing Detection panel: six parser cards (MuPDF · Poppler · Ghostscript · qpdf · pdfminer · pdf.js), each showing pages, objects, PDF version, JavaScript, encryption, AcroForm, embedded files, linearized, OpenAction, annotations, structural integrity. Seven mismatch badge types (Critical/High/Medium) highlight parser-evasion discrepancies. |
-| **🧬 Polyglot** | Polyglot/Embedded Binary Detection panel (magic-byte hits with type and risk badge) + JavaScript AST Deobfuscation panel (obfuscation findings — dynamic eval, fromCharCode arrays, unescape calls, large numeric arrays, new Function). |
-| **🎣 Phishing** | Phishing signal score, credential harvesting detection, urgency phrase tags, brand keyword tags (Microsoft/PayPal/Apple etc.), decoded QR codes, OCR-extracted text from images, phishing indicators |
-| **📎 Embedded** | Embedded file attachments: name, magic-byte type (PE/ELF/OLE/ZIP/script), size, SHA-256, suspicious flag, VBA macro detection, ZIP archive content listing (up to 50 entries with dangerous-extension flags), nested PDF detection |
-| **✍️ Signature** | PDF digital signature forensics: signature count, ByteRange coverage gap (shadow-document indicator), post-signing revision analysis (objects added after signing), unsigned JavaScript/launch actions, certificate chain details (subject, issuer, algorithm, expiry, self-signed flag) |
-| **🏷️ Metadata** | Document metadata KV table (title, author, subject, keywords, creator, producer, dates, format, XMP flag) + structure info KV table (version, EOF markers, xref tables, linearized, binary comment, stream counts) + full 25-engine structure dump |
-| **📋 Raw JSON** | Complete scan result JSON with syntax highlighting and one-click copy. All engine outputs, indicators, structure fields, streams, URLs, and metadata. |
-| **🔍 Raw Forensics** | True forensic data view: JavaScript source code extracted from streams, JavaScript AST Deobfuscation indicator contexts, all decoded stream content (3 KB preview), every indicator context snippet, and a sorted KV dump of all structure fields from all 25 engines |
+| Tab | Badge | Contents |
+|---|---|---|
+| **📊 Summary** | — | Risk banner + score meter, 15-cell stats grid (3 clickable), engines-completed pill strip (✓ {engine name} for all 30 that ran), ML Intelligence panel (probability bar + SHAP feature bars + false-positive / confirm-threat feedback buttons if scan_id available) |
+| **⚠️ Threats** | indicator count | All indicators grouped Critical → High → Medium → Low. Each card shows: risk badge, engine label, count pill, indicator key, description, byte-context snippet |
+| **📈 Score** | — | Score gauge (large number + bar, 0–999), per-engine contribution bars (points breakdown), full "every indicator scored" table: engine / indicator / risk / base pts / count multiplier / total pts |
+| **⚙️ Engines** | — | Two-panel browser: left sidebar lists all 31 engines (status dot: green=clean · orange=findings · grey=skipped, findings count pill). Click any engine → right panel shows full indicator cards, engine-specific data (stream table for ③, URL list for ⑤, SHAP bars for ⑯, differential table for ⑰, certificate chain for ㉑, correlation bonuses + **Per-Engine Indicator Counts** table + **Final Risk Assessment** KV for ㉛), and all structure fields |
+| **🌐 URLs** | URL count | All unique HTTP/HTTPS URLs from raw bytes + decompressed streams, per-URL copy button |
+| **📦 Streams** | suspicious count | Top 40 streams table: XRef # · type (with tooltip) · decompressed size · Shannon entropy bar (red if > 7.2) · status (OK / High Entropy / Patterns Found) · matched patterns. Suspicious rows highlighted amber, high-entropy rows orange. |
+| **🧠 ML** | malicious % | LightGBM + IsolationForest + RandomForest ensemble: malicious probability bar (colour-coded by risk), model version, context adjustment note, SHAP bar chart (per-feature directional contribution, red=malicious / green=benign), feature importance bars, false-positive / confirm-threat feedback buttons (trains next model update) |
+| **🔬 Sandbox** | behavioural score | 7-cell metrics grid (Behavioral Score · Network Attempts · Exec Attempts · Process Forks · FS Escape Attempts · Anon Exec Memory · Timeout/Hang — cells turn red at critical thresholds), renderer list, sandbox threat indicators, matched YARA rules |
+| **🌍 Threat Intel** | `!` if malicious | Confirmed-malware banner (if SHA-256 matches), SHA-256 display, per-database results (URLhaus · MalwareBazaar · ThreatFox · FeodoTracker · OpenPhish), domain-level TI matches (source badge + URL + type tags), campaign attribution details (TLSH · pHash · JS fingerprint), similar malicious sample list with similarity % |
+| **🎯 MITRE** | technique count | All ATT&CK technique IDs mapped from indicators — ID + name + tactic, grouped by tactic. Indicator rows per technique. |
+| **🔬 Parsing** | — | Differential Parsing Detection: 6 parser cards (MuPDF · Poppler · Ghostscript · qpdf · pdfminer · pdf.js), each showing pages, objects, PDF version, JS, encryption, AcroForm, embedded files, linearised, OpenAction, annotations, structural integrity. Mismatch badges (Critical / High / Medium) flag parser-evasion discrepancies. |
+| **🧬 Polyglot** | — | Magic-byte hits (type + risk badge) from Engine ⑱, plus JS AST deobfuscation findings (dynamic eval · fromCharCode arrays · unescape calls · large numeric arrays · `new Function`) from Engine ⑲ |
+| **🎣 Phishing** | signal score | Phishing signal score meter, credential harvesting detection, urgency phrase tags, brand keyword tags (Microsoft · PayPal · Apple · etc.), QR code decodes, OCR-extracted text from images, phishing indicator cards |
+| **📎 Embedded** | file count | Per-file cards: name · magic-byte type (PE/ELF/OLE/ZIP/script) · size · VBA macro detection · ZIP content listing (50 entries, dangerous-extension flags) · dangerous PE import list · suspicious string list · nested PDF detection |
+| **✍️ Signature** | — | Signature status card (count or "None"), ByteRange coverage gap (shadow-document indicator), post-signing revision diff (objects added after signing), unsigned JS/launch actions flag, per-certificate cards (subject · issuer · valid dates · algorithm · self-signed · expired) |
+| **🏷️ Metadata** | — | Document metadata KV table (title · author · subject · keywords · creator · producer · dates · XMP flag) + structure info KV table (version · EOF markers · xref tables · linearised · binary comment · stream counts) + full 31-engine structure dump |
+| **📋 Raw JSON** | — | Complete scan result JSON, syntax-highlighted (strings · keys · booleans · nulls · numbers), one-click copy button |
+| **🔍 Raw Forensics** | — | JavaScript source code from streams · JS AST deobfuscation contexts · decoded stream content (3 KB preview per stream) · every indicator context snippet · complete sorted KV dump of all structure fields from all 31 engines |
 
 ### Sanitize Options
 
-After a scan, 9 sanitize methods are available using the session token — the original is never modified.
+After every scan (including clean results), a 9-mode sanitize panel appears below the result. The session token links the sanitize request to the uploaded file; the original is never modified — all operations produce a new file for download. After sanitization completes a **Download Sanitized PDF** button and a **Scan the Sanitized File** button appear (re-runs the full 31-engine scan on the cleaned output).
 
 **Basic**
 
@@ -1632,7 +1686,7 @@ pdf/
 │   ├── toolbar-drag.js        # PDF editor toolbar drag-to-reorder (CSP-compliant)
 │   └── tools/                 # All tool scripts are ES modules (type="module")
 │       ├── upload.js          # PdfUploadUtil — shared XHR upload handler
-│       ├── scan.js            # Threat scanner — engine strip animation, 18-tab report renderer with per-engine two-panel browser (sidebar + detail pane with SHAP/feature-importance bars, stream table, URL list, per-parser diff table, phishing tags, embedded file cards, sig forensics, campaign fingerprints, correlation breakdown), Raw Forensics tab (JS sources, decoded streams, indicator contexts, structure dump), 9-mode sanitize flow (flatten · strip · remove-js · remove-embedded · remove-xfa · remove-richmedia · normalize · flatten-forms · remove-metadata)
+│       ├── scan.js            # Threat scanner — engine strip animation, 20-tab report renderer with per-engine two-panel browser (sidebar + detail pane with SHAP/feature-importance bars, stream table, URL list, per-parser diff table, phishing tags, embedded file cards, sig forensics, campaign fingerprints, correlation breakdown), Raw Forensics tab (JS sources, decoded streams, indicator contexts, structure dump), 9-mode sanitize flow (flatten · strip · remove-js · remove-embedded · remove-xfa · remove-richmedia · normalize · flatten-forms · remove-metadata)
 │       ├── camera-scan.js     # Camera document scanner — live viewfinder, Sobel edge overlay, perspective handles, multi-page gallery, OCR mode
 │       ├── merge.js           # Thumbnail preview + drag reorder; upload progress bar; server-phase cycling status messages (6 rotating messages while Ghostscript merges)
 │       ├── split.js           # Cut-point preview + range/interval modes
@@ -1705,7 +1759,7 @@ pdf/
 └── tools/                     # PHP tool pages
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
-    ├── scan.php               # PDF Forensics Scanner — 25-engine structural + behavioural + ML + differential + polyglot + AST forensic analysis + 9-mode sanitize (flatten · strip active content · remove JS · remove embedded files · remove XFA · remove rich media · normalize structure · flatten forms · strip metadata)
+    ├── scan.php               # PDF Forensics Scanner — 31-engine structural + behavioural + ML + differential + polyglot + AST forensic analysis + 9-mode sanitize (flatten · strip active content · remove JS · remove embedded files · remove XFA · remove rich media · normalize structure · flatten forms · strip metadata)
     ├── camera-scan.php        # Camera/photo document scanner — live viewfinder, perspective correction, OCR mode
     ├── merge.php
     ├── split.php
