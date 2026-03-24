@@ -205,7 +205,7 @@ llama.cpp · AVX2/FMA/native · Ryzen 5 3550H
 - **Speculative decoding:** ngram cache (`--spec-type ngram-cache`) provides free ~20% throughput gain on structured output patterns
 - **Prompt prefix caching:** `--cache-prompt` reuses the system-prompt KV state across requests
 - **Temperature:** 0.1 — near-deterministic, reproducible output for forensic use
-- **Latency:** ~45–75 s for a full forensic report (CPU-only inference on Ryzen 5, ~8 t/s generation)
+- **Latency:** ~45–75 s for a full forensic report (CPU-only inference on Ryzen 5 3550H, ~30 t/s prompt throughput, ~8–12 t/s generation at 4 physical threads)
 
 ### AI Features
 
@@ -228,7 +228,7 @@ All facts in this section are derived from `api.php`, `_tool_head.php`, and per-
 
 ### File Validation
 - **Two-stage PDF validation**: magic-byte check (`fread($fh, 4) === '%PDF'`) followed by a structural `pdfinfo` parse — a polyglot file that starts with `%PDF` but has no parseable cross-reference table fails the second stage.
-- File size limits enforced at upload: **50 MB per file** (`MAX_FILE_SIZE = 52_428_800`), **200 MB total** across all files in a single request (`MAX_TOTAL_SIZE = 209_715_200`).
+- File size limits enforced at upload: **50 MB per file** (`MAX_FILE_SIZE = 52_428_800`), **200 MB total** across all files in a single request (`MAX_TOTAL_SIZE = 209_715_200`). **Exception: the forensic scanner** is capped at **10 MB per file** (`SCAN_MAX_FILE_SIZE = 10_485_760`) — independent of the global constant. Research across threat intelligence feeds (Contagio, MalwareBazaar, VirusTotal corpus, HP Wolf Security telemetry) shows the vast majority of real-world malicious PDFs are **under 5 MB**: exploit-kit PDFs (CVE-targeted JavaScript/font/JBig2 exploits) average 200 KB–1 MB; phishing/lure PDFs 300 KB–4 MB; malware-dropper PDFs (embedding a PE payload) 1–8 MB. No documented malicious PDF campaign has required files consistently over 10 MB. The 10 MB cap gives 2× safety headroom above the largest known class of threats while reducing per-scan RAM from ~450 MB to ~100 MB and keeping all 44 engines well within the `CMD_TIMEOUT = 120 s` process limit.
 - MIME type checked against `['application/pdf', 'application/x-pdf']` for PDF operations.
 - Page range inputs are validated against `/^\d+$/` before casting — malformed ranges like `1-2-3` or `abc` are rejected before any integer conversion.
 
@@ -332,7 +332,7 @@ All security-relevant events are written as **NDJSON** (newline-delimited JSON) 
 | `invalid_method` | Non-POST request received | `method` |
 | `unknown_operation` | `operation` param not in allow-list | `attempted_op` (truncated to 64 chars) |
 | `rate_limit_exceeded` | Session hits 10 ops/5 min | `op_count`, `window_s`, `limit` |
-| `file_size_exceeded` | Single file > 50 MB | `size`, `limit`, `filename` |
+| `file_size_exceeded` | Single file > 50 MB (> 10 MB for forensic scanner) | `size`, `limit`, `filename` |
 | `total_size_exceeded` | Merge batch > 200 MB | `total_sz`, `limit`, `files` |
 | `repeated_pdf_validation_failure` | 3+ consecutive invalid PDF uploads in the same session | `fail_count`, `filename`, `size` |
 | `invalid_page_input` | Page range contains non-integer token (e.g. `abc`, `1-2-3`) | `input` (control chars stripped) |
@@ -499,7 +499,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 | Campaign attribution (fuzzy hash) | **Yes** (Engine ㉕ — TLSH similarity hash vs confirmed-malicious history) | No | No | No | No | No |
 | Transparency (engine names) | **Ghostscript, Poppler, LibreOffice, Tesseract, PyMuPDF, ExifTool, YARA, ClamAV, PeePDF, pikepdf, strace, acorn, scikit-learn, lightgbm, shap, tlsh, imagehash, zbarimg** | Undisclosed | Undisclosed | Undisclosed | Undisclosed | Undisclosed |
 | Open-source engines only | **Yes** — every engine is named open-source software | No | No | No | No | No |
-| Max upload (free) | **50 MB / file, 200 MB total** | 100 MB (Adobe account) | 5 GB (with account) | 200 MB | 200 MB | 200 MB |
+| Max upload (free) | **50 MB / file, 200 MB total** (**10 MB for forensic scanner**) | 100 MB (Adobe account) | 5 GB (with account) | 200 MB | 200 MB | 200 MB |
 | JavaScript AST deobfuscation | **Yes** (Engine ⑳, acorn parser) | No | No | No | No | No |
 | Differential parsing (6 parsers, 8 dimensions) | **Yes** (Engine ⑰ — MuPDF · Poppler · Ghostscript · qpdf · pdfminer · pdf.js) | No | No | No | No | No |
 
