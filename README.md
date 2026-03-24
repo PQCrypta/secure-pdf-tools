@@ -19,7 +19,7 @@ Four specific gaps drove this project:
 Existing tools retain files for cleanup windows (1 hour, 2 hours, "as soon as possible"). The server-side `send_file()` function in this project calls `cleanup()` immediately after `readfile()` — the temp directory is deleted while the download is still in flight. There is no retention window because there is no buffer.
 
 **2. No multi-engine threat analysis for PDFs**
-PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 44 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine with SHAP explainability (IsolationForest + RandomForest + LightGBM on a 38-feature vector), a differential parsing engine comparing six independent parsers across 8 structural dimensions, a polyglot binary detector, a JavaScript AST deobfuscator, fully offline local threat intelligence (URLhaus · MalwareBazaar · ThreatFox — 6.4M+ indicators, zero external API calls), PDF signature forensics (ByteRange shadow-document detection), phishing detection (credential harvesting, brand impersonation, QR codes), embedded file analysis (PE/ELF/OLE/VBA), and TLSH fuzzy-hash campaign attribution. Every indicator is mapped to a MITRE ATT&CK technique ID.
+PDF is the most exploited document format. No free tool runs more than a signature check against uploaded files. This project runs 45 independent analysis engines — 15 static heuristic engines, a dynamic behavioral sandbox that actually executes the PDF in an isolated Linux namespace with full syscall tracing, an ML Intelligence Engine with SHAP explainability (IsolationForest + RandomForest + LightGBM on a 38-feature vector), a differential parsing engine comparing six independent parsers across 8 structural dimensions, a polyglot binary detector, a JavaScript AST deobfuscator, fully offline local threat intelligence (URLhaus · MalwareBazaar · ThreatFox — 6.4M+ indicators, zero external API calls), PDF signature forensics (ByteRange shadow-document detection), phishing detection (credential harvesting, brand impersonation, QR codes), embedded file analysis (PE/ELF/OLE/VBA), and TLSH fuzzy-hash campaign attribution. Every indicator is mapped to a MITRE ATT&CK technique ID.
 
 **3. No post-quantum cryptography in document workflows**
 All existing tools use AES-256 at best. This project integrates 31 post-quantum algorithms (NIST-standardised ML-KEM-1024, HQC-128/192/256, FN-DSA variants, and hybrid modes) for PDF encryption, running client-side in the browser before any data is transmitted.
@@ -73,7 +73,7 @@ Other PDF tools that offer AI analysis send your document content to OpenAI, Cla
 
 | Tool | Link | Description |
 |---|---|---|
-| **PDF Forensics Scanner** | [/tools/scan.php](https://pqpdf.com/tools/scan.php) | Forensic analysis across **44 independent engines** — most comprehensive free PDF forensics tool available. **New engines (31–43):** PDF Token Obfuscation detector (hex-escaped name token decoding — /J#61vaScript → /JavaScript — whitespace-split keyword injection, formfeed byte evasion), XFA FormCalc parser (exec/openURL/submit/initialize auto-execute), PDF action dependency graph (cycles · deep chains · fan-in · sleeper nodes), OCG layer cloaking (never-visible · screen/print divergence · hidden clickable links), Unicode & invisible text (RLO U+202E · rendering mode 3/7 · homograph domains), trailer chain forensics (raw /Prev walk · ID mutation · /Root swap Shadow Attack), codec exploit parameter validation (CCITTFax OOB · JBIG2Globals CVE-2009-0658 · DCT mismatch · multi-filter chains), physical entropy topology (PDF-structure-aware sliding window · post-EOF · entropy cliffs), image steganography (LSB chi-square · tracking beacons · JPEG EXIF anomalies), PDF/A compliance fraud (DLP bypass detection), JavaScript behavioral emulation (Node.js vm + Acrobat API stub · LAUNCH_URL · SUBMIT_FORM · MAIL), font CharString emulator (Type 1 decrypt + stack machine · seac OOB · depth overflow), XRef integrity graph (phantom objects · orphan sleepers · free-entry bugs · length fraud). **All existing engines:** structural integrity · 45+ byte signatures · stream entropy · metadata forensics (ExifTool) · font analysis · CVE patterns · qpdf · YARA · PeePDF · dynamic sandbox (strace + Linux namespaces) · ClamAV · ML+SHAP (IsolationForest + RandomForest + LightGBM) · six-parser differential · polyglot detection · JS AST deobfuscation · threat intelligence (6.4M+ local indicators) · signature forensics · phishing · embedded file analysis · campaign attribution · weighted correlation engine (60+ compound patterns + MITRE ATT&CK). Results across **24 analysis tabs**: Summary · Threats · Score · Engines · URLs · Streams · ML · Sandbox · TI · MITRE · Differential · Polyglot · Phishing · Embedded · Signature · History · Annotations · Metadata · XFA · Action Graph · Deep Forensics · **🤖 AI Forensic Report** (Qwen 2.5 3B Instruct synthesises all 44 engine outputs into threat verdict + confidence + executive summary + attack narrative + MITRE technique grid + recommended actions — grammar-constrained JSON, fully local, ~3–5 s CPU inference) · Raw JSON · Raw Forensics. **9-mode sanitize.** |
+| **PDF Forensics Scanner** | [/tools/scan.php](https://pqpdf.com/tools/scan.php) | Forensic analysis across **45 independent engines** — most comprehensive free PDF forensics tool available. **New engines (31–43):** PDF Token Obfuscation detector (hex-escaped name token decoding — /J#61vaScript → /JavaScript — whitespace-split keyword injection, formfeed byte evasion), XFA FormCalc parser (exec/openURL/submit/initialize auto-execute), PDF action dependency graph (cycles · deep chains · fan-in · sleeper nodes), OCG layer cloaking (never-visible · screen/print divergence · hidden clickable links), Unicode & invisible text (RLO U+202E · rendering mode 3/7 · homograph domains), trailer chain forensics (raw /Prev walk · ID mutation · /Root swap Shadow Attack), codec exploit parameter validation (CCITTFax OOB · JBIG2Globals CVE-2009-0658 · DCT mismatch · multi-filter chains), physical entropy topology (PDF-structure-aware sliding window · post-EOF · entropy cliffs), image steganography (LSB chi-square · tracking beacons · JPEG EXIF anomalies), PDF/A compliance fraud (DLP bypass detection), JavaScript behavioral emulation (Node.js vm + Acrobat API stub · LAUNCH_URL · SUBMIT_FORM · MAIL), font CharString emulator (Type 1 decrypt + stack machine · seac OOB · depth overflow), XRef integrity graph (phantom objects · orphan sleepers · free-entry bugs · length fraud). **All existing engines:** structural integrity · 45+ byte signatures · stream entropy · metadata forensics (ExifTool) · font analysis · CVE patterns · qpdf · YARA · PeePDF · dynamic sandbox (strace + Linux namespaces) · ClamAV · ML+SHAP (IsolationForest + RandomForest + LightGBM) · six-parser differential · polyglot detection · JS AST deobfuscation · threat intelligence (6.4M+ local indicators) · signature forensics · phishing · embedded file analysis · campaign attribution · weighted correlation engine (60+ compound patterns + MITRE ATT&CK). Results across **24 analysis tabs**: Summary · Threats · Score · Engines · URLs · Streams · ML · Sandbox · TI · MITRE · Differential · Polyglot · Phishing · Embedded · Signature · History · Annotations · Metadata · XFA · Action Graph · Deep Forensics · **🤖 AI Forensic Report** (Qwen 2.5 3B Instruct synthesises all 44 engine outputs into threat verdict + confidence + executive summary + key findings + MITRE technique grid + recommended actions — structured JSON, fully local, ~45–75 s CPU inference) · Raw JSON · Raw Forensics. **9-mode sanitize.** |
 | **Protect PDF** | [/tools/protect.php](https://pqpdf.com/tools/protect.php) | Dual-mode protection: **Standard** (AES-256-CBC server-side) or **PQC** (client-side quantum-safe encryption). See details below. |
 | **Unlock PDF** | [/tools/unlock.php](https://pqpdf.com/tools/unlock.php) | Remove password protection (owner password required). Detects the encryption type client-side by reading the PDF header before upload — shows a `🔒 AES-256 encrypted` badge for password-protected files or a `✅ No password protection detected` badge if the file is already unlocked. PQC bundles (`.pqcpdf`) are auto-detected by extension and routed to the quantum-safe decryption panel. |
 | **Redact PDF** | [/tools/redact.php](https://pqpdf.com/tools/redact.php) | Two modes: text-pattern redaction (with multi-pattern list, case sensitivity, whole-word matching) or mouse-drawn region redaction on a canvas preview. Custom fill colour. **🤖 AI Redaction Suggestions** — Qwen 2.5 3B analyses extracted text and proposes patterns by PII category (names, emails, phone numbers, IDs, financial data, etc.) with one-click add to the redaction list. |
@@ -201,17 +201,17 @@ llama.cpp · AVX2/FMA/native · Ryzen 5 3550H
 - **Model:** Qwen 2.5 3B Instruct Q4_K_M (GGUF) — 2.0 GB, runs entirely in RAM (`--mlock`)
 - **Inference:** llama.cpp `llama-server`, built from source with AVX2/FMA optimisations
 - **Transport:** WireGuard VPN tunnel — end-to-end encrypted, never public internet
-- **Schema enforcement:** `response_format.json_schema` — grammar-constrained token generation guarantees valid JSON matching the exact schema on every call, no parsing failures
+- **Schema enforcement:** `response_format.json_object` — structured JSON output validated and normalised server-side
 - **Speculative decoding:** ngram cache (`--spec-type ngram-cache`) provides free ~20% throughput gain on structured output patterns
 - **Prompt prefix caching:** `--cache-prompt` reuses the system-prompt KV state across requests
-- **Temperature:** 0.0 — fully deterministic, reproducible output for forensic use
-- **Latency:** ~3–8 s for a full forensic report (CPU inference, no GPU required)
+- **Temperature:** 0.1 — near-deterministic, reproducible output for forensic use
+- **Latency:** ~45–75 s for a full forensic report (CPU-only inference on Ryzen 5, ~8 t/s generation)
 
 ### AI Features
 
 | Feature | Endpoint | Description |
 |---|---|---|
-| **🤖 AI Forensic Report** | `pdf-scan` | After each scan, Qwen synthesises all 44 engine outputs into: threat verdict (MALICIOUS/SUSPICIOUS/LIKELY_CLEAN/CLEAN), confidence, executive summary, attack narrative, key findings table with MITRE IDs, technique grid, threat actor profile, recommended actions, false-positive assessment |
+| **🤖 AI Forensic Report** | `pdf-scan` | After each scan, Qwen synthesises all 44 engine outputs into: threat verdict (MALICIOUS/SUSPICIOUS/LIKELY_CLEAN/CLEAN), confidence, executive summary, key findings with MITRE IDs and severity, observed technique grid, recommended actions, false-positive note |
 | **🤖 AI Document Analysis** | `pdf-ai-docinfo` | After text extraction: document type classification (13 types), language, plain-English summary, key topics, named entities (people, organisations, dates, amounts, locations), reading level |
 | **🤖 AI Redaction Suggestions** | `pdf-ai-redact-suggest` | Scans extracted text for PII and proposes redaction patterns by category (names, emails, phone, IDs, financial, addresses, etc.) with one-click add to the redaction list |
 | **🤖 AI Change Analysis** | `pdf-ai-compare-explain` | After a visual diff: change significance rating (MAJOR/MODERATE/MINOR/NONE), change type classification, plain-English change summary, and recommendation |
@@ -454,7 +454,7 @@ Two modes:
 
 **[pqpdf.com/enterprise.php](https://pqpdf.com/enterprise.php)**
 
-The full PQ PDF engine — all 45 tools, all 44 forensic engines, the four-layer sandbox, ML models with SHAP explainability, TLSH campaign attribution, fully offline threat intelligence (6.4M+ local indicators — URLhaus, MalwareBazaar, ThreatFox), and post-quantum cryptography — packaged for deployment inside your own infrastructure.
+The full PQ PDF engine — all 45 tools, all 45 forensic engines, the four-layer sandbox, ML models with SHAP explainability, TLSH campaign attribution, fully offline threat intelligence (6.4M+ local indicators — URLhaus, MalwareBazaar, ThreatFox), and post-quantum cryptography — packaged for deployment inside your own infrastructure.
 
 ### Why On-Premise
 
@@ -487,7 +487,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 |---|---|---|---|---|---|---|
 | File retention after processing | **Deleted during download** (cleanup in send_file()) | Up to 1 hour (published policy) | Up to 1 hour | Up to 2 hours | Up to 1 hour | Up to 1 hour |
 | Account required | **No** | Yes (for most features) | No (limited) | No (limited) | No | No |
-| Threat scanning engines | **44 independent engines** incl. ML + SHAP + sandbox + TI + MITRE ATT&CK + phishing + campaign attribution | None | None | None | None | None |
+| Threat scanning engines | **45 independent engines** incl. ML + SHAP + sandbox + TI + MITRE ATT&CK + phishing + campaign attribution | None | None | None | None | None |
 | ML-based anomaly detection | **Yes** (IsolationForest + RandomForest + LightGBM ensemble, 38-feature vector, continuously retrained, model drift detection) | No | No | No | No | No |
 | Dynamic behavioral sandbox | **Yes** (strace + Linux namespaces, full syscall trace) | No | No | No | No | No |
 | Post-quantum encryption | **Yes** (31 algorithms via @noble/post-quantum, client-side) | No | No | No | No | No |
@@ -509,11 +509,11 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 
 [/tools/scan.php](https://pqpdf.com/tools/scan.php)
 
-**44 forensic engines** — the most comprehensive free PDF threat analysis available, including techniques absent from every commercial static scanner:
+**45 forensic engines** — the most comprehensive free PDF threat analysis available, including techniques absent from every commercial static scanner:
 
 **New engines (31–43):** PDF Token Obfuscation Detector (hex-escape decoding — /J#61vaScript → /JavaScript — whitespace-split keyword injection, formfeed byte evasion, null-byte header anomalies) · XFA FormCalc Script Extractor (the only static tool that parses FormCalc — exec/openURL/submit exfiltration/initialize auto-execute) · PDF Action Dependency Graph (directed graph of all actions — cycles, deep chains, fan-in maximization, dead sleeper nodes) · OCG Layer Cloaking (hidden optional content groups with never-visible and screen/print divergence detection) · Unicode & Invisible Text (rendering mode 3/7 invisible text, RLO override attacks U+202E, homograph domains) · Trailer Chain Forensics (raw /Prev chain walk — ID mutation, /Root swap Shadow Attack, encryption changes) · Codec Exploit Parameter Validation (CCITTFax OOB, JBIG2Globals CVE-2009-0658, DCT mismatch, LZW EarlyChange, multi-filter chains) · Physical Entropy Topology (PDF-structure-aware sliding-window entropy — post-EOF data, entropy cliffs) · Image Steganography (LSB chi-square test, tracking beacons, JPEG EXIF anomalies) · PDF/A Compliance Fraud Detection (false archival claims bypass DLP) · JavaScript Behavioral Emulation (Node.js vm + full Acrobat API stub — captures LAUNCH_URL, SUBMIT_FORM, MAIL at runtime) · Font CharString Stack Machine Emulator (Type 1 bytecode decryption + emulation) · Cross-Object XRef Integrity Graph (phantom objects, orphan sleeper payloads, free-entry bugs, length fraud).
 
-**Existing engines:** 15 static heuristic engines · dynamic behavioral sandbox (Linux namespace isolation, syscall tracing) · ML Intelligence Engine (SHAP explanations) · differential parsing across six independent parsers · polyglot binary detector · JavaScript AST deobfuscation · AcroForm field forensics · document revision history · annotation forensics · named tree analysis · content stream forensics · object stream analysis · threat intelligence (6.4M+ local indicators) · PDF signature forensics · phishing detection · embedded file analysis · TLSH fuzzy-hash campaign attribution · weighted correlation engine (60+ compound patterns). All 44 engines run server-side in a single request. Every indicator is tagged with a MITRE ATT&CK technique ID.
+**Existing engines:** 15 static heuristic engines · dynamic behavioral sandbox (Linux namespace isolation, syscall tracing) · ML Intelligence Engine (SHAP explanations) · differential parsing across six independent parsers · polyglot binary detector · JavaScript AST deobfuscation · AcroForm field forensics · document revision history · annotation forensics · named tree analysis · content stream forensics · object stream analysis · threat intelligence (6.4M+ local indicators) · PDF signature forensics · phishing detection · embedded file analysis · TLSH fuzzy-hash campaign attribution · weighted correlation engine (60+ compound patterns). All 45 engines run server-side in a single request. Every indicator is tagged with a MITRE ATT&CK technique ID.
 
 ### How It Works
 
@@ -537,7 +537,7 @@ Facts are derived from code (`api.php` constants, engine list, scan.php source).
 18. Engine ㊹ (Correlation Engine) cross-references all 43 preceding engine findings and adds weighted bonus points for 60+ dangerous combinations (e.g. JavaScript + `/OpenAction` + high entropy = +100). Final score capped at 999.
 19. All 55 MITRE ATT&CK technique mappings are applied across all indicators. `mitre_techniques` list added to scan result for SIEM/SOAR integration.
 20. All indicators are deduplicated, sorted by risk level, and returned as JSON with a composite risk score, ML malicious-probability score, and MITRE ATT&CK technique list.
-21. The client renders a 24-tab report: 📊 Summary (includes compact AI verdict widget), ⚠️ Threats, 📈 Score, ⚙️ Engines (per-engine two-panel browser — click any of 44 engines to see its full findings, structure fields, and special data), 🌐 URLs, 📦 Streams, 🧠 ML (LightGBM probability, SHAP bar chart, feature importances), 🔬 Sandbox, 🌍 Threat Intel, 🎯 MITRE ATT&CK, 🔬 Parsing, 🧬 Polyglot, 🎣 Phishing, 📎 Embedded, ✍️ Signature, 📜 History, 📌 Annotations, 🏷️ Metadata, 🤖 AI Forensic Report (Qwen 2.5 3B Instruct — self-hosted, no third-party AI — structured verdict + attack narrative + MITRE technique grid + recommended actions), 📋 Raw JSON, and 🔍 Raw Forensics (decoded stream content, JavaScript sources, all indicator contexts, complete structure dump). Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip with 44 chips shows each engine completing in sequence during the scan.
+21. The client renders a 24-tab report: 📊 Summary (includes compact AI verdict widget), ⚠️ Threats, 📈 Score, ⚙️ Engines (per-engine two-panel browser — click any of 44 engines to see its full findings, structure fields, and special data), 🌐 URLs, 📦 Streams, 🧠 ML (LightGBM probability, SHAP bar chart, feature importances), 🔬 Sandbox, 🌍 Threat Intel, 🎯 MITRE ATT&CK, 🔬 Parsing, 🧬 Polyglot, 🎣 Phishing, 📎 Embedded, ✍️ Signature, 📜 History, 📌 Annotations, 🏷️ Metadata, 🤖 AI Forensic Report (Qwen 2.5 3B Instruct — self-hosted, no third-party AI — structured verdict + MITRE technique grid + recommended actions), 📋 Raw JSON, and 🔍 Raw Forensics (decoded stream content, JavaScript sources, all indicator contexts, complete structure dump). Clickable stat cards on the Summary tab navigate directly to the corresponding tab. An animated engine-chip strip with 45 chips (including 🤖 AI Forensic Report) shows each engine completing in sequence during the scan.
 
 ### Scoring
 
@@ -1430,7 +1430,7 @@ Builds a complete cross-reference graph by parsing both traditional XRef tables 
 
 ### MITRE ATT&CK Mapping
 
-Every indicator produced by all 44 engines is tagged with one or more MITRE ATT&CK technique IDs via a 55-entry lookup table keyed on indicator name substrings:
+Every indicator produced by all 45 engines is tagged with one or more MITRE ATT&CK technique IDs via a 55-entry lookup table keyed on indicator name substrings:
 
 | Technique ID | Name | Triggered by |
 |---|---|---|
@@ -1463,7 +1463,7 @@ Each log line has three parts:
 | Badge | Colour-coded label | `UPLOAD` · `INFO` · `START` · `DONE` · `WARN` · `ERROR` · `Clean` |
 | Message | Human-readable description | `Upload complete (0.11s) — token: pdftool_…` |
 
-Section dividers (`── Upload ──`, `── Engines ──`, `── Results ──`) separate phases. The console can be collapsed/expanded and cleared with header buttons. When all 44 engines complete, a `Clean` or risk-level badge appears alongside the final elapsed time.
+Section dividers (`── Upload ──`, `── Engines ──`, `── Results ──`) separate phases. The console can be collapsed/expanded and cleared with header buttons. When all 45 engines complete, a `Clean` or risk-level badge appears alongside the final elapsed time.
 
 ### Result Banner and Risk Levels
 
@@ -1530,7 +1530,7 @@ The tab bar uses a pill-style design with background highlighting on hover and a
 
 ### Sanitize Options
 
-After every scan (including clean results), a 9-mode sanitize panel appears below the result. The session token links the sanitize request to the uploaded file; the original is never modified — all operations produce a new file for download. After sanitization completes a **Download Sanitized PDF** button and a **Scan the Sanitized File** button appear (re-runs the full 44-engine scan on the cleaned output).
+After every scan (including clean results), a 9-mode sanitize panel appears below the result. The session token links the sanitize request to the uploaded file; the original is never modified — all operations produce a new file for download. After sanitization completes a **Download Sanitized PDF** button and a **Scan the Sanitized File** button appear (re-runs the full 45-engine scan on the cleaned output).
 
 **Basic**
 
@@ -1949,6 +1949,7 @@ pdf/
 │   ├── extract.sh             # Step 2 — unpack ui.tar.gz into web root, create runtime dirs, set permissions
 │   ├── install.sh             # Step 3 — configure application (Apache, PHP-FPM, SSL, env file, DB schema, cron)
 │   ├── setup-proxy.sh         # Step 4 — install and configure pqcrypta-proxy (PQC TLS, HTTP/3, ACME, rate limiting)
+│   ├── setup-remotellm.sh     # AI backend setup — provisions a separate machine as the LLM inference node: builds llama.cpp (AVX2/FMA, CPU-only), downloads Qwen 2.5 3B Instruct Q4_K_M GGUF (~2 GB), installs llama-server systemd service (port 8081, --mlock, --n-gpu-layers 0), tunes vm.swappiness, and optionally configures a WireGuard tunnel back to the main server. Run with --wireguard to also set up the encrypted VPN link.
 │   ├── schema.sql             # PostgreSQL schema — pdf_scan_history table, indexes, grants
 │   ├── package.sh             # Build a versioned distributable archive of the web UI
 │   ├── ui.tar.gz              # Pre-built web UI archive — all PHP, CSS, JS, Python scripts (1.3 MB)
@@ -2047,7 +2048,7 @@ pdf/
 └── tools/                     # PHP tool pages
     ├── _tool_head.php         # Shared header (CSP nonces, nav with PDF Home link)
     ├── _tool_foot.php         # Shared footer (cache-busted pdf-processing.js)
-    ├── scan.php               # PDF Forensics Scanner — 44-engine structural + behavioural + ML + differential + polyglot + AST forensic analysis + 9-mode sanitize (flatten · strip active content · remove JS · remove embedded files · remove XFA · remove rich media · normalize structure · flatten forms · strip metadata)
+    ├── scan.php               # PDF Forensics Scanner — 45-engine structural + behavioural + ML + differential + polyglot + AST forensic analysis + 9-mode sanitize (flatten · strip active content · remove JS · remove embedded files · remove XFA · remove rich media · normalize structure · flatten forms · strip metadata)
     ├── camera-scan.php        # Camera/photo document scanner — live viewfinder, perspective correction, OCR mode
     ├── merge.php
     ├── split.php
@@ -2206,7 +2207,7 @@ curl -X POST https://pqpdf.com/api.php \
   -b cookies.txt
 ```
 
-Returns `{ "status": "running" }` while the 44 engines execute, then the full threat report JSON once complete. Poll every 2 seconds until `status` is `done` or `error`.
+Returns `{ "status": "running" }` while the 45 engines execute, then the full threat report JSON once complete. Poll every 2 seconds until `status` is `done` or `error`.
 
 **Threat report envelope:**
 ```json
@@ -2297,7 +2298,7 @@ No. Every operation — including OCR, threat scanning, format conversion, and M
 All connections are served over TLS 1.2/1.3 via Apache with HSTS (`max-age=31536000; includeSubDomains; preload`). HTTP connections are upgraded by the `upgrade-insecure-requests` CSP directive. Certificate pinning is not enforced at the application layer; browsers rely on standard CA chain validation.
 
 **Q: Does the PDF forensics scanner send files or hashes to VirusTotal or any external service?**
-No. The scanner is fully offline — no VirusTotal, no AlienVault OTX, no external API calls of any kind during a scan. All 44 forensic engines run entirely locally, including the Threat Intelligence engine (Engine ⑳), which queries local PostgreSQL databases. URLhaus, MalwareBazaar, and ThreatFox data is downloaded in bulk by cron and stored on-server; no data leaves the server during a scan. PyMuPDF, ExifTool, qpdf, YARA, PeePDF, pikepdf, ClamAV, the scikit-learn/LightGBM ML models, and the dynamic sandbox (`strace` + `unshare` Linux namespaces) all execute on the same server.
+No. The scanner is fully offline — no VirusTotal, no AlienVault OTX, no external API calls of any kind during a scan. All 45 forensic engines run entirely locally, including the Threat Intelligence engine (Engine ⑳), which queries local PostgreSQL databases. URLhaus, MalwareBazaar, and ThreatFox data is downloaded in bulk by cron and stored on-server; no data leaves the server during a scan. PyMuPDF, ExifTool, qpdf, YARA, PeePDF, pikepdf, ClamAV, the scikit-learn/LightGBM ML models, and the dynamic sandbox (`strace` + `unshare` Linux namespaces) all execute on the same server.
 
 **Q: What data does the ML engine store?**
 Engine ⑯ writes a 38-feature vector (structural heuristics, entropy scores, indicator counts) derived from each scan to PostgreSQL. **No file content, file name, IP address, or user identifier is stored.** The feature vector contains only numeric measurements extracted from the PDF structure. Stored records are used exclusively to retrain the IsolationForest, RandomForest, and LightGBM models every 30 minutes. Users can submit a feedback label (malicious / benign) via the scan report UI; this label is appended to the existing feature row, not stored separately.
