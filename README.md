@@ -793,129 +793,6 @@ The only engine that actually *executes* the PDF. Renders the file through three
 - **Network isolation guarantee** — in a network namespace with no interfaces, any `connect()` is definitively malicious. There is no legitimate reason for a PDF renderer to initiate a network connection.
 - **Feeds Correlation Engine** — sets `sandbox_network_attempts`, `sandbox_mmap_exec_anon`, `sandbox_exec_attempts`, `sandbox_behavioral_score` flags used by Engine ㊹ for compound scoring
 
-### Engine ㊹ — Correlation Engine
-
-Cross-references all findings from Engines ①–㊸ and scores 60+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
-
-**Weighted voting with log-scaling** — the engine uses a `weighted_vote()` function that applies logarithmic scaling to multi-engine confirmation signals, so each additional independent engine confirming a threat adds a progressively diminishing but always positive score increment. This prevents runaway score inflation from repeated low-quality signals while still rewarding genuine cross-engine convergence.
-
-**ML-Correlation feedback boost** — when the ML Intelligence Engine (⑯) reports an anomaly score >0.7, the Correlation Engine amplifies its own compound scoring by a fixed boost factor. High ML anomaly confidence is a strong independent signal that the document's feature vector is structurally unusual, and the boost ensures that ML-flagged documents receive appropriately elevated correlation scores even when individual indicator combinations fall just below bonus thresholds.
-
-**Multi-engine JavaScript confirmation bonus** — when 3 or more independent engines each independently confirm JavaScript presence (e.g. Engine ②, Engine ④, Engine ⑬, Engine ⑱ all flag JS), an additional confirmation bonus is applied on top of existing JS-combination bonuses. Independent corroboration from multiple parsers and analysis methods substantially reduces false-positive risk and justifies elevated scoring.
-
-**Auto-execution combinations (highest danger)**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| `/OpenAction` + JavaScript | +75 | Document auto-executes JS on open — zero user interaction required |
-| `/OpenAction` + `/Launch` | +80 | Auto-launches external program on open |
-| JavaScript + `/Launch` | +80 | Script-controlled arbitrary program execution |
-
-**Payload delivery combinations**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| JavaScript + `/EmbeddedFile` | +65 | `exportDataObject()` drops attachment to disk and executes it |
-| JavaScript + `/XFA` | +45 | XFA+JS full document scripting — multiple historic critical CVEs |
-| JavaScript + `/RichMedia` | +40 | JS controls Flash/multimedia objects — historic heap-spray surface |
-
-**Obfuscation & shellcode chains**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| `unescape()` + JavaScript | +75 | Classic Unicode-escaped shellcode decode-and-execute |
-| `eval()` + JavaScript | +60 | Dynamic execution of obfuscated payload strings |
-| `eval()` + `unescape()` | +85 | Textbook two-stage shellcode loader |
-| `String.fromCharCode` + JavaScript | +40 | Character-level string assembly to evade pattern matching |
-| `/JBIG2Decode` + JavaScript | +100 | CVE-2009-0658 exact combination confirmed (CVSS 9.3) |
-| JavaScript + heapspray | +90 | JS sprays the heap before triggering a vulnerability |
-| Multiple heapspray patterns (≥2) | +80 | Two or more distinct NOP/heap-fill sigs = active exploit attempt |
-| Deep encoding + JavaScript | +50 | Multi-pass codec layers hiding JS from static scanners |
-| Multiple `%%EOF` + JavaScript | +35 | Polyglot structure confuses parsers away from malicious JS objects |
-
-**Metadata & structure combinations**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| Empty metadata + JavaScript | +35 | Stripped attribution + active scripting = crafted exploit profile |
-| Empty metadata + `/EmbeddedFile` | +20 | Dropper PDFs strip metadata to avoid reputation-based triggers |
-| `/OpenAction` + `/EmbeddedFile` | +45 | Auto-triggered file drop on open — no JavaScript required |
-| `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
-| Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
-
-**Metadata & structure combinations**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| Empty metadata + JavaScript | +35 | Stripped attribution + active scripting = crafted exploit profile |
-| Empty metadata + `/EmbeddedFile` | +20 | Dropper PDFs strip metadata to avoid reputation-based triggers |
-| `/OpenAction` + `/EmbeddedFile` | +45 | Auto-triggered file drop on open — no JavaScript required |
-| `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
-| Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
-
-**Cross-engine compound patterns (Engines ⑩–⑬ → ㊹)**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| qpdf structural damage + JavaScript | +70 | Broken xref/trailer hides JS exploit objects from most parsers |
-| qpdf structural damage + `/Launch` or `/EmbeddedFile` | +65 | Structurally concealed executable delivery payload |
-| ExifTool exploit-kit fingerprint + JavaScript | +80 | Known exploit tool generated this document; active JS confirms intent |
-| ExifTool exploit-kit fingerprint + `/Launch` or `/EmbeddedFile` | +75 | Exploit-kit-generated dropper PDF confirmed |
-| Multiple YARA critical rules (≥2) | +60–90 | Stacked YARA critical hits confirm active malicious document (scales with count) |
-| YARA heap-spray + JavaScript | +50 | Byte-level corroboration of heap-spray+JS delivery chain |
-| YARA shellcode loader + auto-exec trigger | +70 | Complete exploit chain confirmed: load → execute |
-| PeePDF vulnerability + JavaScript | +55–85 | Cross-engine vulnerability confirmation (scales with vuln count) |
-| PeePDF vulnerability + heap-spray | +65 | Full memory-corruption exploit chain confirmed by independent parser |
-
-**Dynamic sandbox compound patterns (Engine ⑭ → ㊹)**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| Dynamic network beacon + JavaScript | +95 | Live connection attempt confirmed + JS delivery vector — active C2-connected exploit |
-| Dynamic shellcode + heap-spray | +95 | Runtime anonymous exec memory + static heap spray — full memory-corruption chain confirmed by both static and dynamic analysis |
-| Dynamic shell spawn + PDF trigger (`/AA`, `/OpenAction`, `/Launch`) | +95 | Runtime process execution + auto-trigger mechanism — confirmed exploitation with persistence hook |
-| Dynamic exploitation + ExifTool exploit-kit fingerprint | +90 | Runtime behavior + known exploit-kit origin — high-confidence exploit kit delivery |
-| Dynamic exploitation + PeePDF vulnerability | +90 | Two independent analysis paths (dynamic + structural) both confirm exploitation |
-| Dynamic beacon + suspicious URL match | +85 | Live network calls + static C2-pattern URLs — confirmed exfiltration capability |
-| Dynamic shellcode + JavaScript | +90 | Runtime exec memory + JS delivery vector — JS staging shellcode payload confirmed |
-| Render timeout + JavaScript | +45 | Renderer hung >20 s + embedded JS — JS infinite-loop DoS exploit |
-
-**Threat Intelligence compound patterns (Engine ⑳ → ㊹)**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| TI hash confirmed malicious | +120 | Definitive hash match — the exact file is known malware |
-| TI hash confirmed + JavaScript or auto-exec | +40 | Known malware + active content — confirmed exploit delivery |
-| TI hash confirmed + live sandbox beaconing | +50 | Three independent engines agree: known malware + runtime C2 |
-
-**Phishing compound patterns (Engine ㉒ → ㊹)**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| Credential harvesting + brand impersonation | +70 | AcroForm SubmitForm + password field + impersonation keywords = classic phishing PDF |
-| Credential form + suspicious submission URL | +80 | Form submits credentials to a C2 endpoint — confirmed exfiltration |
-| QR code + suspicious embedded URL | +45 | QR routes victims to phishing pages while bypassing URL scanners |
-| High phishing score (≥3) + JavaScript | +40 | Urgency phrases + JS may auto-submit forms or redirect the victim |
-
-**Embedded file compound patterns (Engine ㉓ → ㊹)**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| Embedded executable + auto-exec trigger | +100 | Complete dropper chain: trigger drops and runs the payload |
-| Embedded executable + JavaScript | +85 | JS can call `exportDataObject()` to drop and execute the attachment |
-| OLE attachment with VBA + JavaScript | +80 | Dual payload: JS drops the OLE file, macros execute on open |
-| Embedded executable + ExifTool exploit-kit fingerprint | +90 | Professionally crafted dropper from a known attack toolkit |
-
-**Signature forensics compound patterns (Engine ㉑ → ㊹)**
-
-| Combination | Bonus | Why |
-|---|---|---|
-| ByteRange gap + JavaScript | +95 | Unsigned JS injected after signing — shadow document attack |
-| Post-signature revisions with execution content | +90 | Execution vectors added after the document was signed |
-| ByteRange gap + qpdf structural damage | +85 | Combined forgery + structural damage hides the payload from both validators and structure scanners |
-
-**Dampening:** isolated `/OpenAction` with no JavaScript, no `/Launch`, no embedded files, no heapspray, no XFA, and no RichMedia has its score reduced by 7 points — `/OpenAction` alone is common in legitimate PDFs for navigation and zoom.
-
 ### Engine ⑮ — ClamAV Signature Scanner
 
 Runs the local ClamAV daemon against the PDF and reports any signature matches:
@@ -1425,6 +1302,146 @@ Builds a complete cross-reference graph by parsing both traditional XRef tables 
 - **Free-entry exploitation** — XRef free-list entries (`f` type) with generation numbers deviating from standard increments; used to hide objects that become reachable after a use-after-free vulnerability in the PDF parser
 - **Object length fraud** — stream objects whose declared `/Length` diverges from the actual byte count between `stream` and `endstream` markers; parsers that trust the declared length read different content than parsers that scan for the marker
 - **Feeds Correlation Engine** — XRef phantom object + orphan sleeper combination adds +90 bonus in Engine ㊹
+
+---
+
+### Engine ㊹ — Correlation Engine
+
+Cross-references all findings from Engines ①–㊸ and scores 60+ dangerous indicator combinations that are orders of magnitude more serious than their individual parts. Each matched combination adds a weighted bonus on top of the base indicator scores.
+
+**Weighted voting with log-scaling** — the engine uses a `weighted_vote()` function that applies logarithmic scaling to multi-engine confirmation signals, so each additional independent engine confirming a threat adds a progressively diminishing but always positive score increment. This prevents runaway score inflation from repeated low-quality signals while still rewarding genuine cross-engine convergence.
+
+**ML-Correlation feedback boost** — when the ML Intelligence Engine (⑯) reports an anomaly score >0.7, the Correlation Engine amplifies its own compound scoring by a fixed boost factor. High ML anomaly confidence is a strong independent signal that the document's feature vector is structurally unusual, and the boost ensures that ML-flagged documents receive appropriately elevated correlation scores even when individual indicator combinations fall just below bonus thresholds.
+
+**Multi-engine JavaScript confirmation bonus** — when 3 or more independent engines each independently confirm JavaScript presence (e.g. Engine ②, Engine ④, Engine ⑬, Engine ⑱ all flag JS), an additional confirmation bonus is applied on top of existing JS-combination bonuses. Independent corroboration from multiple parsers and analysis methods substantially reduces false-positive risk and justifies elevated scoring.
+
+**Auto-execution combinations (highest danger)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| `/OpenAction` + JavaScript | +75 | Document auto-executes JS on open — zero user interaction required |
+| `/OpenAction` + `/Launch` | +80 | Auto-launches external program on open |
+| JavaScript + `/Launch` | +80 | Script-controlled arbitrary program execution |
+
+**Payload delivery combinations**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| JavaScript + `/EmbeddedFile` | +65 | `exportDataObject()` drops attachment to disk and executes it |
+| JavaScript + `/XFA` | +45 | XFA+JS full document scripting — multiple historic critical CVEs |
+| JavaScript + `/RichMedia` | +40 | JS controls Flash/multimedia objects — historic heap-spray surface |
+
+**Obfuscation & shellcode chains**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| `unescape()` + JavaScript | +75 | Classic Unicode-escaped shellcode decode-and-execute |
+| `eval()` + JavaScript | +60 | Dynamic execution of obfuscated payload strings |
+| `eval()` + `unescape()` | +85 | Textbook two-stage shellcode loader |
+| `String.fromCharCode` + JavaScript | +40 | Character-level string assembly to evade pattern matching |
+| `/JBIG2Decode` + JavaScript | +100 | CVE-2009-0658 exact combination confirmed (CVSS 9.3) |
+| JavaScript + heapspray | +90 | JS sprays the heap before triggering a vulnerability |
+| Multiple heapspray patterns (≥2) | +80 | Two or more distinct NOP/heap-fill sigs = active exploit attempt |
+| Deep encoding + JavaScript | +50 | Multi-pass codec layers hiding JS from static scanners |
+| Multiple `%%EOF` + JavaScript | +35 | Polyglot structure confuses parsers away from malicious JS objects |
+
+**Metadata & structure combinations**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Empty metadata + JavaScript | +35 | Stripped attribution + active scripting = crafted exploit profile |
+| Empty metadata + `/EmbeddedFile` | +20 | Dropper PDFs strip metadata to avoid reputation-based triggers |
+| `/OpenAction` + `/EmbeddedFile` | +45 | Auto-triggered file drop on open — no JavaScript required |
+| `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
+| Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
+
+**Metadata & structure combinations**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Empty metadata + JavaScript | +35 | Stripped attribution + active scripting = crafted exploit profile |
+| Empty metadata + `/EmbeddedFile` | +20 | Dropper PDFs strip metadata to avoid reputation-based triggers |
+| `/OpenAction` + `/EmbeddedFile` | +45 | Auto-triggered file drop on open — no JavaScript required |
+| `/AA` + JavaScript | +40 | Event-driven JS triggers on field/page interaction |
+| Suspicious URL patterns | +30–60 | IP-literal, raw-port, or randomised-subdomain C2 indicators |
+
+**Cross-engine compound patterns (Engines ⑩–⑬ → ㊹)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| qpdf structural damage + JavaScript | +70 | Broken xref/trailer hides JS exploit objects from most parsers |
+| qpdf structural damage + `/Launch` or `/EmbeddedFile` | +65 | Structurally concealed executable delivery payload |
+| ExifTool exploit-kit fingerprint + JavaScript | +80 | Known exploit tool generated this document; active JS confirms intent |
+| ExifTool exploit-kit fingerprint + `/Launch` or `/EmbeddedFile` | +75 | Exploit-kit-generated dropper PDF confirmed |
+| Multiple YARA critical rules (≥2) | +60–90 | Stacked YARA critical hits confirm active malicious document (scales with count) |
+| YARA heap-spray + JavaScript | +50 | Byte-level corroboration of heap-spray+JS delivery chain |
+| YARA shellcode loader + auto-exec trigger | +70 | Complete exploit chain confirmed: load → execute |
+| PeePDF vulnerability + JavaScript | +55–85 | Cross-engine vulnerability confirmation (scales with vuln count) |
+| PeePDF vulnerability + heap-spray | +65 | Full memory-corruption exploit chain confirmed by independent parser |
+
+**Dynamic sandbox compound patterns (Engine ⑭ → ㊹)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Dynamic network beacon + JavaScript | +95 | Live connection attempt confirmed + JS delivery vector — active C2-connected exploit |
+| Dynamic shellcode + heap-spray | +95 | Runtime anonymous exec memory + static heap spray — full memory-corruption chain confirmed by both static and dynamic analysis |
+| Dynamic shell spawn + PDF trigger (`/AA`, `/OpenAction`, `/Launch`) | +95 | Runtime process execution + auto-trigger mechanism — confirmed exploitation with persistence hook |
+| Dynamic exploitation + ExifTool exploit-kit fingerprint | +90 | Runtime behavior + known exploit-kit origin — high-confidence exploit kit delivery |
+| Dynamic exploitation + PeePDF vulnerability | +90 | Two independent analysis paths (dynamic + structural) both confirm exploitation |
+| Dynamic beacon + suspicious URL match | +85 | Live network calls + static C2-pattern URLs — confirmed exfiltration capability |
+| Dynamic shellcode + JavaScript | +90 | Runtime exec memory + JS delivery vector — JS staging shellcode payload confirmed |
+| Render timeout + JavaScript | +45 | Renderer hung >20 s + embedded JS — JS infinite-loop DoS exploit |
+
+**Threat Intelligence compound patterns (Engine ⑳ → ㊹)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| TI hash confirmed malicious | +120 | Definitive hash match — the exact file is known malware |
+| TI hash confirmed + JavaScript or auto-exec | +40 | Known malware + active content — confirmed exploit delivery |
+| TI hash confirmed + live sandbox beaconing | +50 | Three independent engines agree: known malware + runtime C2 |
+
+**Phishing compound patterns (Engine ㉒ → ㊹)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Credential harvesting + brand impersonation | +70 | AcroForm SubmitForm + password field + impersonation keywords = classic phishing PDF |
+| Credential form + suspicious submission URL | +80 | Form submits credentials to a C2 endpoint — confirmed exfiltration |
+| QR code + suspicious embedded URL | +45 | QR routes victims to phishing pages while bypassing URL scanners |
+| High phishing score (≥3) + JavaScript | +40 | Urgency phrases + JS may auto-submit forms or redirect the victim |
+
+**Embedded file compound patterns (Engine ㉓ → ㊹)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| Embedded executable + auto-exec trigger | +100 | Complete dropper chain: trigger drops and runs the payload |
+| Embedded executable + JavaScript | +85 | JS can call `exportDataObject()` to drop and execute the attachment |
+| OLE attachment with VBA + JavaScript | +80 | Dual payload: JS drops the OLE file, macros execute on open |
+| Embedded executable + ExifTool exploit-kit fingerprint | +90 | Professionally crafted dropper from a known attack toolkit |
+
+**Signature forensics compound patterns (Engine ㉑ → ㊹)**
+
+| Combination | Bonus | Why |
+|---|---|---|
+| ByteRange gap + JavaScript | +95 | Unsigned JS injected after signing — shadow document attack |
+| Post-signature revisions with execution content | +90 | Execution vectors added after the document was signed |
+| ByteRange gap + qpdf structural damage | +85 | Combined forgery + structural damage hides the payload from both validators and structure scanners |
+
+**Dampening:** isolated `/OpenAction` with no JavaScript, no `/Launch`, no embedded files, no heapspray, no XFA, and no RichMedia has its score reduced by 7 points — `/OpenAction` alone is common in legitimate PDFs for navigation and zoom.
+
+---
+
+### Engine 45 — 🤖 AI Forensic Report
+
+Self-hosted Qwen 2.5 1.5B Instruct Q4_K_M (GGUF, 1.1 GB) running on a dedicated remote machine (remotellm, Ryzen 5 3550H) via a private WireGuard tunnel. No document content ever leaves private infrastructure — zero third-party AI API calls.
+
+- **Model** — Qwen 2.5 1.5B Instruct Q4_K_M; performance CPU governor locked via systemd `ExecStartPre`; llama-server built from source with AVX2/FMA optimisations; `--mlock` keeps the model in RAM; `--n-gpu-layers 0` (CPU-only — Vulkan iGPU offload tested but slower for generation at this output length)
+- **Input** — structured JSON payload built from all 44 preceding engine outputs: risk score, risk level, indicators (key + description + risk, capped to top 15), ML probability + SHAP explanation snippet, phishing summary, JS call list (top 4), embedded strings (top 4), XFA FormCalc snippet, annotation actions, sandbox behavioral score, MITRE technique list. Total prompt ≈ 250–400 characters system + 800–1,400 characters user.
+- **Output** — structured JSON: `verdict` (CLEAN / SUSPICIOUS / DANGEROUS), `confidence` (LOW / MEDIUM / HIGH), `summary` (2–3 sentence plain-English forensic narrative), `key_findings` (array of specific indicators the model weighted most heavily), `mitre_techniques` (array of T-codes with tactic labels), `recommended_action` (OPEN_SAFELY / REVIEW_CAREFULLY / DO_NOT_OPEN / SANITIZE_FIRST)
+- **Schema-constrained generation** — output is constrained by a JSON schema passed to the llama-server `/completion` endpoint via `json_schema` parameter; forces valid JSON structure without post-processing
+- **Max tokens** — 220 output tokens; typical generation ~15–20 s at ~13 tokens/s
+- **Redis caching** — completed reports cached in Redis for 24 hours keyed on file token; repeat scans of identical files skip LLM inference
+- **Timeout** — PHP CURLOPT_TIMEOUT 120 s; client polls `/api.php?action=llm_status` every 3 s during inference; progress bar animates from 96 % to 99 % while waiting
+- **Feeds ML retraining** — AI verdict label stored alongside the scan record; used by the ML training pipeline as a soft label for borderline cases where human labelling is unavailable
 
 ---
 
